@@ -14,6 +14,9 @@
         'point_of_sale._assets_pos': [
             'azk_pos_enhanced_receipt/static/src/**/*',
         ],
+        'web.assets_tests': [
+            'azk_pos_enhanced_receipt/static/tests/tours/**/*',
+        ],
     },
     'installable': True,
     'application': False,

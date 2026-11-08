@@ -6,7 +6,7 @@ Two of the three exercises were selected:
 | Exercise | Module(s) | Status |
 |---|---|---|
 | 2 — Dynamic Trial Balance | [`azk_dynamic_trial_balance`](azk_dynamic_trial_balance) | **Done** — see below |
-| 3 — POS Enhancements | `azk_pos_salesperson`, `azk_pos_enhanced_receipt` | **Pending** — next milestone |
+| 3 — POS Enhancements | [`azk_pos_salesperson`](azk_pos_salesperson), [`azk_pos_enhanced_receipt`](azk_pos_enhanced_receipt) | **Done** — see below |
 | 1 — Odoo Partner Monitor | — | Not selected |
 
 **Target version: Odoo 20.0 Enterprise** (`20.0+e-20261105`). The assessment text mentions Odoo 18
