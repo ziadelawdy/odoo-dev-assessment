@@ -1,7 +1,9 @@
+import dataclasses
 import re
 from collections import defaultdict
 
 from odoo import _, api, models
+from odoo.tools import SQL
 
 SPLIT_SECTIONS = ('initial_balance', 'end_balance')
 ACCOUNT_LEVEL_MARKUPS = ('undistributed_profits_losses', 'cumulative_translation_adjustment')
@@ -63,6 +65,94 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
             # analytic lines, i.e. only the share distributed to the account.
             options['analytic_groupby_option'] = True
             options['analytic_accounts_list'] = tuple(azk_tb['analytic_account_ids'])
+
+        self._azk_init_amount_currency_column(options, azk_tb['show_amount_currency'])
+
+    @api.model
+    def _azk_init_amount_currency_column(self, options, show):
+        """Amount Currency is a single column, in the End section, and only
+        when the option is enabled."""
+        def column_type(column):
+            group = options['column_groups'][column['column_group_index']]
+            return group['forced_options'].get('trial_balance_column_type')
+
+        options['columns'] = [
+            column for column in options['columns']
+            if column['expression_label'] != 'amount_currency' or (show and column_type(column) == 'end_balance')
+        ]
+        if show and len(options['column_headers']) == 1:
+            # Sections no longer have the same number of columns: give each
+            # header its own colspan (as the native Initial/End headers do).
+            for index, header in enumerate(options['column_headers'][0]):
+                header['colspan'] = sum(1 for column in options['columns'] if column['column_group_index'] == index)
+
+    # ------------------------------------------------------------------
+    # Engine
+    # ------------------------------------------------------------------
+    def _report_engine_trial_balance(self, options, date_scope, formulas_dict, current_groupby, warnings=None):
+        """Same as the native engine (account_trial_balance_report.py) with an
+        extra ``amount_currency`` aggregate, needed for "Show Amount Currency".
+        The native engine builds its SELECT inline, so it cannot be extended
+        through super()."""
+        report = self.env['account.report'].browse(options['report_id'])
+        current_groupbys = [current_groupby] if current_groupby and not isinstance(current_groupby, list) else current_groupby or []
+        report._check_groupby_fields(current_groupbys)
+        result_key = next(iter(formulas_dict.values()))
+        empty = {'balance': 0.0, 'debit': 0.0, 'credit': 0.0, 'amount_currency': 0.0}
+
+        if 'id' in current_groupbys and options['trial_balance_column_type'] == 'initial_balance':
+            return {result_key: []}
+        if options['trial_balance_column_type'] == 'end_balance':
+            return {result_key: [] if current_groupbys else {**empty, 'has_sublines': True}}
+
+        extra_domain = []
+        if fiscalyear_start := options.get('trial_balance_block_fiscalyear_start'):
+            extra_domain = [
+                '|',
+                ('account_id.include_initial_balance', '=', True),
+                ('date', '>=', fiscalyear_start),
+            ]
+        if options.get('export_mode') == 'print' and options.get('filter_search_bar'):
+            extra_domain.append(('account_id', 'ilike', options['filter_search_bar']))
+
+        block_end_date = None
+        if options['trial_balance_column_type'] == 'initial_balance':
+            date_scope = 'from_beginning'
+            block_end_date = options.get('trial_balance_block_end_date')
+
+        query = report._get_report_query(options, date_scope, domain=extra_domain, cta_date_to=block_end_date)
+        select_groupby = SQL()
+        if current_groupbys:
+            select_groupby = SQL(',\n').join(
+                SQL("%s AS %s",
+                    self.env['account.move.line']._field_to_sql("account_move_line", groupby_key, query),
+                    SQL.identifier(f'groupby_key_{groupby_key}'))
+                for groupby_key in current_groupbys
+            )
+            query.groupby = SQL(',').join(SQL.identifier(f'groupby_key_{groupby_key}') for groupby_key in current_groupbys)
+
+        query_results = self.env.execute_query_dict(query.select(SQL(', ').join(s for s in (
+            select_groupby,
+            SQL('COALESCE(SUM(%s), 0.0) AS balance', query.table.consolidation_balance),
+            SQL('COALESCE(SUM(%s), 0.0) AS credit', query.table.consolidation_credit),
+            SQL('COALESCE(SUM(%s), 0.0) AS debit', query.table.consolidation_debit),
+            SQL('COALESCE(SUM(%s), 0.0) AS amount_currency', query.table.amount_currency),
+        ) if s)))
+
+        if not current_groupbys:
+            if not query_results:
+                return {result_key: {**empty, 'has_sublines': False}}
+            return {result_key: {**query_results[0], 'has_sublines': True}}
+
+        return {result_key: [
+            (
+                result[f'groupby_key_{current_groupbys[0]}']
+                if len(current_groupbys) == 1
+                else tuple(result[f'groupby_key_{groupby}'] for groupby in current_groupbys),
+                {**result, 'has_sublines': True},
+            )
+            for result in query_results
+        ]}
 
     @api.model
     def _azk_sanitize(self, raw):
@@ -126,6 +216,8 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
             return lines
         if (options.get('azk_tb') or {}).get('account_prefixes'):
             lines = self._azk_apply_prefixes_to_earnings_lines(report, options, lines)
+        if (options.get('azk_tb') or {}).get('show_amount_currency'):
+            lines = self._azk_split_lines_by_currency(report, options, lines)
 
         # The native postprocessor moves the report total to the end and tags
         # its id with the 'total' markup; sub-line expansions have no total.
@@ -238,6 +330,69 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         ]
         total_index = len(kept) - 1 if kept and report._get_markup(kept[-1].id) == 'total' else len(kept)
         return kept[:total_index] + recomputed + kept[total_index:]
+
+    def _azk_split_lines_by_currency(self, report, options, lines):
+        """Replace every account line by one line per transaction currency.
+        Their company-currency figures add up to the account's; the Amount
+        Currency column (End section) shows the end balance in that currency.
+        Lines aggregating several currencies (parents, earnings, total) keep
+        their Amount Currency cell empty."""
+        groupby = ['account_id', 'currency_id']
+        data = defaultdict(dict)  # {(account_id, currency_id): {column_group_index: values}}
+        for group_index, group_options in report._split_options_per_column_group(options).items():
+            if group_options.get('trial_balance_column_type') not in ('initial_balance', 'period'):
+                continue
+            result = self._report_engine_trial_balance(group_options, 'strict_range', {'azk': 'azk'}, groupby)
+            for (account_id, currency_id), values in result['azk']:
+                data[(account_id, currency_id)][group_index] = values
+
+        currencies_by_account = defaultdict(list)
+        for account_id, currency_id in sorted(data):
+            currencies_by_account[account_id].append(currency_id)
+
+        new_lines = []
+        for line in lines:
+            account_id = report._get_res_id_from_line_id(line.id, 'account.account')
+            markup = report._get_markup(line.id)
+            if not account_id or markup in ('parent_account', *ACCOUNT_LEVEL_MARKUPS) or account_id not in currencies_by_account:
+                for column in line.columns:
+                    if column.expression_label == 'amount_currency':
+                        column.no_format = None
+                        column.is_zero = True
+                new_lines.append(line)
+                continue
+            for currency_id in currencies_by_account[account_id]:
+                new_lines.append(self._azk_currency_line(report, options, line, currency_id, data[(account_id, currency_id)]))
+        return new_lines
+
+    def _azk_currency_line(self, report, options, account_line, currency_id, values_by_group):
+        currency = self.env['res.currency'].browse(currency_id)
+        line_id = report._build_subline_id(
+            account_line.id, report._build_line_id([('azk_currency', 'res.currency', currency_id)])
+        )
+        end_amount_currency = sum(values.get('amount_currency', 0.0) for values in values_by_group.values())
+        columns = []
+        for column in account_line.columns:
+            column = dataclasses.replace(column, format_params=dataclasses.replace(column.format_params), name='')
+            if column.column_group_index is not None:
+                column_type = options['column_groups'][column.column_group_index]['forced_options'].get('trial_balance_column_type')
+                if column.expression_label == 'amount_currency':
+                    value = end_amount_currency if column_type == 'end_balance' else None
+                    column.currency = currency
+                    column.format_params.currency_id = currency.id
+                else:
+                    value = values_by_group.get(column.column_group_index, {}).get(column.expression_label, 0.0)
+                column.no_format = value
+                column.is_zero = not value
+            columns.append(column)
+        return dataclasses.replace(
+            account_line,
+            id=line_id,
+            name=f'{account_line.name} ({currency.name})',
+            columns=columns,
+            unfoldable=False,
+            unfolded=False,
+        )
 
     # ------------------------------------------------------------------
     # Helpers

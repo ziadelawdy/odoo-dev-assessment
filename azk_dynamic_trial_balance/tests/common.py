@@ -65,6 +65,8 @@ class AzkTBCommon(TestAccountReportsCommon):
         if markup == 'parent_account':
             return f"PARENT:{report._get_res_id_from_line_id(line.id, 'account.account')}"
         account_id = report._get_res_id_from_line_id(line.id, 'account.account')
+        if markup == 'azk_currency':
+            return f"{account_id}:{report._get_res_id_from_line_id(line.id, 'res.currency')}"
         if account_id:
             return account_id
         return 'TOTAL' if line.name == 'Total' else line.name

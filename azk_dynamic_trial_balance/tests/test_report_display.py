@@ -85,3 +85,70 @@ class TestDisplay(AzkTBCommon):
         flat_with_level = self._values(hierarchy=False, account_level=1)
         self.assertEqual(set(flat), set(flat_with_level))
         self.assertIn(self.leaf_a.id, flat_with_level)
+
+    # ------------------------------------------------------------------
+    # Task 5: Show Amount Currency
+    # ------------------------------------------------------------------
+    def _post_cad_move(self):
+        c1 = self.company_data
+        cad = self.other_currency
+        self.env['account.move'].create({
+            'move_type': 'entry',
+            'date': '2017-06-01',
+            'journal_id': c1['default_journal_misc'].id,
+            'line_ids': [
+                (0, 0, {'name': 'cad', 'account_id': self.leaf_a.id, 'currency_id': cad.id,
+                        'amount_currency': 300.0, 'debit': 150.0, 'credit': 0.0}),
+                (0, 0, {'name': 'cad', 'account_id': c1['default_account_payable'].id, 'currency_id': cad.id,
+                        'amount_currency': -300.0, 'debit': 0.0, 'credit': 150.0}),
+            ],
+        }).action_post()
+        return cad
+
+    def _amount_currency_options(self, hierarchy, show):
+        return self._options(self.report, '2017-01-01', '2017-12-31', hierarchy=hierarchy,
+                             azk_tb={'show_amount_currency': show})
+
+    def test_amount_currency_lines_sum_to_account(self):
+        cad = self._post_cad_move()
+        usd = self.company_data['company'].currency_id
+        without = self._tb_values(self.report, self._amount_currency_options(False, False))
+        options = self._amount_currency_options(False, True)
+        lines = self.report._get_lines(options)
+        values = self._tb_values(self.report, options, lines=lines)
+
+        usd_key, cad_key = f'{self.leaf_a.id}:{usd.id}', f'{self.leaf_a.id}:{cad.id}'
+        self.assertNotIn(self.leaf_a.id, values, 'account line is replaced by its currency lines')
+        self.assertIn(usd_key, values)
+        self.assertIn(cad_key, values)
+        # Leaf A: 300 (2016) + 20 (2017, USD) + 150 (2017, CAD at company rate)
+        self.assertAlmostEqual(without[self.leaf_a.id]['end_balance'], 470.0, places=2)
+        self.assertAlmostEqual(values[usd_key]['end_balance'] + values[cad_key]['end_balance'], 470.0, places=2)
+        self.assertAlmostEqual(values[cad_key]['end_balance'], 150.0, places=2)
+        self.assertAlmostEqual(values[cad_key]['_sections']['end_balance']['amount_currency'], 300.0, places=2)
+        cad_line = next(line for line in lines if self._line_key(self.report, line) == cad_key)
+        self.assertTrue(cad_line.name.endswith(f'({cad.name})'), cad_line.name)
+        for key in TOTAL_KEYS:
+            self.assertAlmostEqual(values['TOTAL'][key], without['TOTAL'][key], places=2, msg=key)
+
+    def test_amount_currency_parent_blank(self):
+        self._post_cad_move()
+        options = self._amount_currency_options(True, True)
+        lines = self.report._get_lines(options)
+        for line in lines:
+            key = self._line_key(self.report, line)
+            if key in (f'PARENT:{self.level_2.id}', f'PARENT:{self.level_1.id}', 'TOTAL'):
+                cells = [c for c in line.columns if c.expression_label == 'amount_currency']
+                self.assertTrue(cells, key)
+                for cell in cells:
+                    self.assertIsNone(cell.no_format, f'{key} must not sum mixed currencies')
+
+    def test_amount_currency_column_hidden_when_off(self):
+        options = self._amount_currency_options(False, False)
+        self.assertFalse([c for c in options['columns'] if c['expression_label'] == 'amount_currency'])
+
+        options = self._amount_currency_options(False, True)
+        ac_columns = [c for c in options['columns'] if c['expression_label'] == 'amount_currency']
+        self.assertEqual(len(ac_columns), 1)
+        group = options['column_groups'][ac_columns[0]['column_group_index']]
+        self.assertEqual(group['forced_options']['trial_balance_column_type'], 'end_balance')
