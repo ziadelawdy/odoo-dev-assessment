@@ -20,6 +20,9 @@
         'point_of_sale._assets_pos': [
             'azk_pos_salesperson/static/src/**/*',
         ],
+        'web.assets_tests': [
+            'azk_pos_salesperson/static/tests/tours/**/*',
+        ],
     },
     'installable': True,
     'application': False,

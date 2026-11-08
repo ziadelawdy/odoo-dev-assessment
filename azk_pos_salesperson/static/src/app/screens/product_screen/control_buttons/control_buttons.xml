@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="azk_pos_salesperson.ControlButtons" t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
+        <xpath expr="//t[@t-if='!this.props.showRemainingButtons']/InternalNoteButton" position="after">
+            <button t-if="this.pos.config.active_salesperson_feature"
+                    class="azk-assign-order-salesperson btn btn-secondary btn-lg lh-lg text-truncate"
+                    t-on-click="() => this.azkAssignOrderSalesperson()">
+                <i class="fa fa-users me-1" aria-hidden="true"/>
+                <span t-if="this.pos.getOrder()?.salesperson_id" t-out="this.pos.getOrder().salesperson_id.name"/>
+                <span t-else="">Assign Salesperson to Order</span>
+            </button>
+        </xpath>
+    </t>
+</templates>
