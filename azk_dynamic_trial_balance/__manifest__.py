@@ -12,6 +12,9 @@
         'data/pdf_export_templates.xml',
         'wizard/dynamic_trial_balance_wizard_views.xml',
     ],
+    'demo': [
+        'demo/demo_data.xml',
+    ],
     'assets': {
         'web.assets_backend': [
             'azk_dynamic_trial_balance/static/src/components/**/*',

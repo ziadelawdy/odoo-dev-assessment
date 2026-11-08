@@ -1,4 +1,5 @@
 import io
+from unittest.mock import patch
 
 from openpyxl import load_workbook
 
@@ -88,8 +89,29 @@ class TestExports(AzkTBCommon):
         self.assertIn('Account prefixes: 1', html)
 
     def test_pdf_generates(self):
-        result = self.report.with_context(force_report_rendering=True).export_to_pdf(self._filtered_options())
-        self.assertTrue(result['file_content'].startswith(b'%PDF'), result['file_content'][:40])
+        """export_to_pdf renders our header and lines and hands them to wkhtmltopdf.
+
+        wkhtmltopdf itself is stubbed: inside a test transaction it would fetch
+        the PDF stylesheet from this same (blocked) Odoo process and deadlock.
+        The real PDF is checked manually with a running server (README)."""
+        captured = {}
+
+        def fake_pdf_engine(_self, engine_name, bodies, **kwargs):
+            captured['bodies'] = bodies
+            return b'%PDF-1.4 stub'
+
+        sale = self.company_data['default_journal_sale']
+        report_model = type(self.env['ir.actions.report'])
+        with patch.object(report_model, '_run_pdf_engine_without_processing', fake_pdf_engine):
+            result = self.report.export_to_pdf(self._filtered_options(journal_ids=[sale.id]))
+
+        self.assertEqual(result['file_type'], 'pdf')
+        self.assertTrue(result['file_content'].startswith(b'%PDF'))
+        html = ''.join(str(body) for body in captured['bodies'])
+        self.assertIn(self.company_data['company'].name, html)
+        self.assertIn('2017-01-01', html)
+        self.assertIn(sale.name, html)
+        self.assertIn(self.company_data['default_account_receivable'].code, html)
 
     def test_wizard_export_actions(self):
         wizard = self.env['azk.dynamic.trial.balance.wizard'].create({'date_from': '2017-01-01', 'date_to': '2017-12-31'})

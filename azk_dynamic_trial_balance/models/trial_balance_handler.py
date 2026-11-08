@@ -70,6 +70,12 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
     # ------------------------------------------------------------------
     def _custom_options_initializer(self, report, options, previous_options):
         super()._custom_options_initializer(report, options, previous_options)
+        # Multi-company "consolidation" regroups lines by account code (the
+        # accounts become hidden sub-lines). Every feature of this report works
+        # on real account lines, so each company's accounts are listed instead.
+        options['show_consolidation'] = False
+        options['consolidation'] = False
+
         azk_tb = self._azk_sanitize(previous_options.get('azk_tb') or {})
         options['azk_tb'] = azk_tb
 
@@ -451,6 +457,12 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
                     value = end_amount_currency if column_type == 'end_balance' else None
                     column.currency = currency
                     column.format_params.currency_id = currency.id
+                    if value is not None and options.get('export_mode') != 'file':
+                        # Odoo prints currency symbols only for multi-currency
+                        # users; a foreign amount always needs its own symbol.
+                        column.name = report._format_value(
+                            {**options, 'multi_currency': True}, value, 'monetary', column.format_params,
+                        )
                 else:
                     value = values_by_group.get(column.column_group_index, {}).get(column.expression_label, 0.0)
                 column.no_format = value
@@ -475,7 +487,9 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         markup = report._get_markup(line.id)
         if markup in ACCOUNT_LEVEL_MARKUPS:
             return True
-        if markup == 'parent_account':
+        # hierarchy parents, and the section totals added below them when the
+        # company uses "totals below sections" (their id embeds the account)
+        if markup in ('parent_account', 'total'):
             return False
         return bool(report._get_res_id_from_line_id(line.id, 'account.account'))
 

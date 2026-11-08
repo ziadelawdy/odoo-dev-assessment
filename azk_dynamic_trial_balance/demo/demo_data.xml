@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Built in Python so account codes, journals and fiscal-year dates fit the database it is loaded in -->
+    <function model="azk.dynamic.trial.balance.report.handler" name="_azk_create_demo_data"/>
+</odoo>

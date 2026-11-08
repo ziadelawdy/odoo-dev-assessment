@@ -135,3 +135,31 @@ class TestEngine(AzkTBCommon):
             native = self._period(self.native, all_entries=all_entries)
             self.assertAlmostEqual(ours[receivable.id]['debit'], expected, places=2, msg=f'all_entries={all_entries}')
             self.assertParity(ours, native, msg=f'all_entries={all_entries}')
+
+    def test_default_options_multi_company_and_totals_below_sections(self):
+        """Regression (found in the Preview): with several companies selected,
+        Odoo defaults to 'consolidation' (lines grouped by account code), and
+        'totals below sections' adds a total under every section. The grand
+        total must still only sum real account balances."""
+        c1, c2 = self.company_data['company'], self.company_data_2['company']
+        c1.totals_below_sections = True
+        Account = self.env['account.account']
+        parent = Account.create({'code': '150000', 'name': 'Parent Assets', 'account_type': 'asset_current'})
+        child = Account.create({'code': '150001', 'name': 'Child', 'account_type': 'asset_current', 'parent_id': parent.id})
+        self._azk_move(self.company_data['default_journal_misc'], '2016-03-01', [
+            (child, 100.0, 0.0), (self.company_data['default_account_payable'], 0.0, 100.0),
+        ]).action_post()
+
+        report = self.report.with_context(allowed_company_ids=[c1.id, c2.id])
+        # Same previous_options as the wizard sends: no explicit 'consolidation' key
+        options = report.get_options({
+            'selected_variant_id': report.id,
+            'date': {'date_from': '2017-01-01', 'date_to': '2017-12-31'},
+            'hierarchy': True,
+        })
+        self.assertFalse(options['consolidation'], 'consolidation (group by code) is not offered')
+        values = self._tb_values(report, options)
+        self.assertIn(child.id, values)
+        total = values['TOTAL']['_sections']
+        for section in ('initial_balance', 'end_balance'):
+            self.assertAlmostEqual(total[section]['debit'], total[section]['credit'], places=2, msg=section)

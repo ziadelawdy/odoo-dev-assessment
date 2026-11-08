@@ -152,3 +152,18 @@ class TestDisplay(AzkTBCommon):
         self.assertEqual(len(ac_columns), 1)
         group = options['column_groups'][ac_columns[0]['column_group_index']]
         self.assertEqual(group['forced_options']['trial_balance_column_type'], 'end_balance')
+
+    def test_amount_currency_shows_symbol(self):
+        """Spec: the Amount Currency column shows the amount with the symbol of
+        its currency (found missing during the manual Preview check)."""
+        cad = self._post_cad_move()
+        options = self._amount_currency_options(False, True)
+        # Odoo only prints currency symbols when the user is in the
+        # multi-currency group; the foreign amount needs its symbol regardless.
+        options['multi_currency'] = False
+        lines = self.report._get_lines(options)
+        cad_line = next(line for line in lines if self._line_key(self.report, line) == f'{self.leaf_a.id}:{cad.id}')
+        cell = next(c for c in cad_line.columns if c.expression_label == 'amount_currency')
+        self.assertIn(cad.symbol, cell.name)
+        self.assertIn('300', cell.name)
+        self.assertEqual(cell.no_format, 300.0, 'raw value kept for exports')
