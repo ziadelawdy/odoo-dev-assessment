@@ -140,7 +140,68 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
                 if line is not total_line and self._azk_is_account_level(report, line)
             ]
             self._azk_split_total_line(options, total_line, account_level_lines)
+
+        azk_tb = options.get('azk_tb') or {}
+        if azk_tb.get('skip_zero_balance'):
+            lines = self._azk_skip_zero_lines(report, options, lines)
+        if azk_tb.get('account_level') and options.get('hierarchy'):
+            lines = self._azk_limit_hierarchy_level(report, lines, azk_tb['account_level'])
         return lines
+
+    def _azk_skip_zero_lines(self, report, options, lines):
+        """Hide account-level lines whose initial balance, period debit,
+        period credit and end balance are all zero (an account whose
+        movements cancel out is kept), then parents left without children."""
+        def is_zero(line):
+            for sections in self._azk_columns_by_block(options, line).values():
+                values = (
+                    self._azk_net(sections.get('initial_balance', {})),
+                    self._azk_value(sections.get('period', {}).get('debit')),
+                    self._azk_value(sections.get('period', {}).get('credit')),
+                    self._azk_net(sections.get('end_balance', {})),
+                )
+                if any(abs(value) > 1e-9 for value in values):
+                    return False
+            return True
+
+        kept = [
+            line for line in lines
+            if not (self._azk_is_account_level(report, line) and is_zero(line))
+        ]
+        return self._azk_drop_childless_parents(report, kept)
+
+    @api.model
+    def _azk_drop_childless_parents(self, report, lines):
+        while True:
+            parent_ids = {line.parent_id for line in lines if line.parent_id}
+            kept = [
+                line for line in lines
+                if report._get_markup(line.id) != 'parent_account' or line.id in parent_ids
+            ]
+            if len(kept) == len(lines):
+                return kept
+            lines = kept
+
+    @api.model
+    def _azk_hierarchy_depth(self, report, line):
+        """Depth in the account tree: 1 for top-level accounts/parents."""
+        parsed = report._parse_line_id(line.id)
+        parents = sum(1 for markup, _model, _value in parsed if markup == 'parent_account')
+        return parents if report._get_markup(line.id) == 'parent_account' else parents + 1
+
+    def _azk_limit_hierarchy_level(self, report, lines, level):
+        """Keep the tree down to ``level``; deeper lines are already included
+        in their ancestors' subtotals, so totals do not change."""
+        kept = []
+        for line in lines:
+            depth = self._azk_hierarchy_depth(report, line)
+            if depth > level:
+                continue
+            if depth == level and report._get_markup(line.id) == 'parent_account':
+                line.unfoldable = False
+                line.unfolded = False
+            kept.append(line)
+        return kept
 
     def _azk_apply_prefixes_to_earnings_lines(self, report, options, lines):
         """Undistributed Profits/Losses (and CTA) belong conceptually to the
