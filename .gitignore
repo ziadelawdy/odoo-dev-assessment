@@ -1,0 +1,7 @@
+odoo-dev.conf
+.local/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+.superpowers/
