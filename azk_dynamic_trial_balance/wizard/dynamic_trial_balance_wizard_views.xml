@@ -33,6 +33,8 @@
                 </div>
                 <footer>
                     <button name="action_preview" string="Preview" type="object" class="btn-primary"/>
+                    <button name="action_pdf" string="PDF" type="object" class="btn-secondary"/>
+                    <button name="action_xlsx" string="XLSX" type="object" class="btn-secondary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>

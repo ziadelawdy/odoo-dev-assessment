@@ -22,6 +22,29 @@ SUMMARY_WARNING = 'azk_dynamic_trial_balance.warning_filter_summary'
 ANALYTIC_WARNING = 'azk_dynamic_trial_balance.warning_analytic_unbalanced'
 
 
+class _RowShiftedSheet:
+    """Worksheet proxy that moves every write ``offset`` rows down, so the
+    native XLSX writer (which always starts at row 0) renders below our
+    header. Only the methods used by the native writer are shifted."""
+
+    def __init__(self, sheet, offset):
+        self._sheet = sheet
+        self._offset = offset
+
+    def write(self, row, col, *args, **kwargs):
+        return self._sheet.write(row + self._offset, col, *args, **kwargs)
+
+    def write_datetime(self, row, col, *args, **kwargs):
+        return self._sheet.write_datetime(row + self._offset, col, *args, **kwargs)
+
+    def merge_range(self, first_row, first_col, last_row, last_col, *args, **kwargs):
+        return self._sheet.merge_range(first_row + self._offset, first_col, last_row + self._offset, last_col, *args, **kwargs)
+
+    def __getattr__(self, name):
+        # set_column and anything row-independent go straight to the sheet
+        return getattr(self._sheet, name)
+
+
 class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
     """Custom handler of the Dynamic Trial Balance.
 
@@ -67,6 +90,10 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
             options['analytic_accounts_list'] = tuple(azk_tb['analytic_account_ids'])
 
         self._azk_init_amount_currency_column(options, azk_tb['show_amount_currency'])
+
+        # PDF header: native filters + period, wizard filters and analytic notice
+        pdf_templates = options.setdefault('custom_display_config', {}).setdefault('pdf_export', {})
+        pdf_templates['pdf_export_filters'] = 'azk_dynamic_trial_balance.pdf_export_filters'
 
     @api.model
     def _azk_init_amount_currency_column(self, options, show):
@@ -206,6 +233,50 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         if azk_tb.get('show_amount_currency'):
             parts.append(_('Amount in currency shown'))
         return ' | '.join(parts)
+
+    # ------------------------------------------------------------------
+    # XLSX export
+    # ------------------------------------------------------------------
+    def _inject_report_into_xlsx_sheet(self, options, workbook):
+        """Hook called by account.report.export_to_xlsx for custom handlers.
+
+        The native sheet has no header (no company, period or filters), so we
+        write one, then let the native writer render the table below it, which
+        keeps its formatting (numeric cells, indentation, bold totals)."""
+        report = self.env['account.report'].browse(options['report_id'])
+        sheet = workbook.add_worksheet(report.name[:31])
+        title = workbook.add_format({'font_name': 'Lato', 'font_size': 14, 'bold': True})
+        text = workbook.add_format({'font_name': 'Lato', 'font_size': 11})
+        warning = workbook.add_format({'font_name': 'Lato', 'font_size': 11, 'bold': True, 'font_color': '#B45309'})
+
+        header = [(report.name, title)]
+        header += [(text_line, text) for text_line in self._azk_export_header_lines(options)]
+        if (options.get('azk_tb') or {}).get('analytic_account_ids'):
+            header.append((self._azk_analytic_notice(), warning))
+        for row, (value, style) in enumerate(header):
+            sheet.write(row, 0, value, style)
+
+        report._inject_report_into_xlsx_sheet(options, workbook, _RowShiftedSheet(sheet, len(header) + 1))
+
+    @api.model
+    def _azk_export_header_lines(self, options):
+        companies = ', '.join(company['name'] for company in options.get('companies', []))
+        lines = [
+            _('Company: %s', companies) if companies else None,
+            _('Period: %(date_from)s - %(date_to)s', date_from=options['date']['date_from'], date_to=options['date']['date_to']),
+            _('Unposted entries included') if options.get('all_entries') else None,
+        ]
+        summary = self._azk_filter_summary(options.get('azk_tb') or {})
+        if summary:
+            lines.append(_('Filters: %s', summary))
+        return [line for line in lines if line]
+
+    @api.model
+    def _azk_analytic_notice(self):
+        return _(
+            'Analytic filter applied: only the amounts distributed to the selected analytic accounts are '
+            'reported; accounts without analytic distribution are excluded, so this report is not balanced.'
+        )
 
     # ------------------------------------------------------------------
     # Lines

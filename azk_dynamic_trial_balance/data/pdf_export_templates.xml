@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- PDF header filters: native filters + period, wizard-only filters and the analytic notice -->
+    <template id="pdf_export_filters">
+        <t t-set="azk_handler" t-value="env['azk.dynamic.trial.balance.report.handler']"/>
+        <div>Period: <span class="o_text_muted"><t t-out="options['date']['date_from']"/> - <t t-out="options['date']['date_to']"/></span></div>
+        <t t-call="account_reports.pdf_export_filters"/>
+        <t t-set="azk_summary" t-value="azk_handler._azk_filter_summary(options.get('azk_tb') or {})"/>
+        <div t-if="azk_summary">Filters: <span class="o_text_muted" t-out="azk_summary"/></div>
+        <div t-if="(options.get('azk_tb') or {}).get('analytic_account_ids')" style="color: #B45309;">
+            <strong t-out="azk_handler._azk_analytic_notice()"/>
+        </div>
+    </template>
+</odoo>

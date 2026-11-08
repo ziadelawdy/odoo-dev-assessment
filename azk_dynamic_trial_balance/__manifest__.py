@@ -9,6 +9,7 @@
     'data': [
         'security/ir.access.csv',
         'data/dynamic_trial_balance_report.xml',
+        'data/pdf_export_templates.xml',
         'wizard/dynamic_trial_balance_wizard_views.xml',
     ],
     'assets': {

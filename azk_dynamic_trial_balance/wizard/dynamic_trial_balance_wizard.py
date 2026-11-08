@@ -113,3 +113,11 @@ class AzkDynamicTrialBalanceWizard(models.TransientModel):
             'context': {'report_id': options['report_id']},
             'params': {'options': options, 'ignore_session': True},
         }
+
+    def action_pdf(self):
+        options = self._build_report_options()
+        return self._report().export_file(options, 'export_to_pdf')
+
+    def action_xlsx(self):
+        options = self._build_report_options()
+        return self._report().export_file(options, 'export_to_xlsx')
