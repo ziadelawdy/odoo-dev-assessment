@@ -31,4 +31,10 @@ was used.
 
 ## Exercise 3 — POS Enhancements
 
-Pending (next milestone).
+| # | Prompt (summary) | Output / outcome |
+|---|---|---|
+| 1 | "Start Exercise 3." The user explained, in their own words, how a new line should inherit the order salesperson. | Assignment rules agreed: global sets order and lines; a line action sets one line; new lines inherit; a line changed manually keeps its value; global again overwrites. |
+| 2 | A receipt mockup (original vs enhanced) was shown inline, and the user approved it. | Enhanced layout fixed: logo, company, customer, then a Product/Qty/Price/Total table with the salesperson under the product. |
+| 3 | An AI subagent mapped the Odoo 20 POS extension points. | Findings: OWL 3 (`useProps`); `pos.load.mixin`; native serializer for sync; the receipt is server QWeb rendered client-side plus a Python mirror; `SelectionPopup` with `makeAwaitable`. |
+| 4 | A builder check on the design by a second agent. | Header blocks are replaced, not duplicated. Feature-off data policy. Basic receipt columns. The test cases are copied verbatim. |
+| 5 | Test-first implementation (6 tasks). | Findings: two order-line list views (both extended); the tours were *skipped* until `websocket-client` was installed (user approved, isolated folder); combo children did not inherit the order salesperson, caught by a tour and fixed; the receipt CSS belongs in the receipt style template; integration tests were proven by deliberate mutations (both caught). |

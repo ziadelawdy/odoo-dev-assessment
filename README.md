@@ -195,3 +195,150 @@ python odoo-bin shell -c <your.conf> -d <db> --no-http < azk_dynamic_trial_balan
   parity tests guard it.
 - With *Show Amount Currency*, Debit/Credit splits are per currency line, so total Debit/Credit
   can differ from the option-off report. Net balances are identical.
+
+---
+
+## Exercise 3 — POS Enhancements (`azk_pos_salesperson`, `azk_pos_enhanced_receipt`)
+
+The exercise is split into two independent modules, as required. Each module installs on its
+own. Installed together, they compose with no bridge module (see *Conflicts* below).
+
+### Salesperson Assignment (`azk_pos_salesperson`)
+
+- **Salespersons** (*Point of Sale › Configuration › Salespersons*): name (required), phone, and
+  an optional related employee. They are archivable and per company.
+- **Per POS settings**, on the POS form and on the POS Settings page:
+  - *Salesperson Assignment* (`active_salesperson_feature`);
+  - *Allowed Salespersons* (`allowed_sale_person_ids`).
+- **Offline:** the allowed salespersons are loaded with the POS data, and assignments are stored
+  on the order and synced with it. Nothing calls the server.
+- **In the POS (feature on):**
+  - a person icon on every order line assigns a salesperson to **that line only**;
+  - **Assign Salesperson to Order** assigns a salesperson to **every line**, and also becomes the
+    order salesperson. **Lines added afterwards inherit it.** A line changed individually keeps
+    its value.
+  - Pressing *Assign to Order* again overwrites all lines (assessment test case 3).
+  - The popup is the native selection popup. It lists the allowed salespersons plus
+    **No salesperson**, which clears the value.
+  - A product added again only merges into a line credited to the same salesperson, so two
+    salespersons selling the same product keep separate lines.
+  - Combo children follow their parent.
+- **Backend:** `salesperson_id` is shown in both order-line list views (*All sales lines* and
+  *Sale line*), and on the order form (order salesperson and line column).
+- **Receipt:** `Salesperson: <name>` is printed under the product, only when the feature is on
+  and the line is assigned. This works on the client receipt and on the server receipt
+  (email/download).
+
+### Enhanced Receipt Layout (`azk_pos_enhanced_receipt`)
+
+- **Per POS settings:**
+  - *Customized Receipt* (`use_customized_receipt`);
+  - *Receipt Logo* (`receipt_logo`);
+  - *Receipt Company Name* / *Details* (`company_name`, `company_details`);
+  - *Show Customer Details* (`show_customer_details`).
+- **Enhanced layout**, from top to bottom:
+  1. Receipt logo, falling back to the standard logo when none is uploaded.
+  2. Company name and details.
+  3. Customer name and address, when enabled.
+  4. Ticket and date.
+  5. A **table** with Product | Qty | Price | Total. The gift/basic receipt has Product | Qty
+     only.
+  6. Totals, taxes, payments and footer, as native.
+
+  The native customer block and the footer company block are replaced, not duplicated.
+- **Option off:** the native receipt, unchanged.
+- **Security:** company name and details are `Html` fields with Odoo's sanitizer, instead of the
+  spec's *Text*, because the spec allows HTML. Scripts and event handlers are stripped on save,
+  so nothing executable reaches the receipt.
+
+### Installation and configuration
+
+```bash
+python odoo-bin -c <your.conf> -d <db> -i azk_pos_salesperson,azk_pos_enhanced_receipt --with-demo
+```
+
+Demo data creates *Salesperson A, B, C*. To set up the assessment configurations (§4.1), go to
+*Point of Sale › Configuration › Point of Sale* and create or open four POS:
+
+| POS | Salesperson Assignment | Allowed | Customized Receipt | Receipt fields |
+|---|---|---|---|---|
+| `POS_Sales_Enabled_Enhanced_Receipt` | ✓ | A, B | ✓ | logo, company name/details, customer details ✓ |
+| `POS_Sales_Enabled_Default_Receipt` | ✓ | A, B | ✗ | — |
+| `POS_Sales_Disabled_Enhanced_Receipt` | ✗ | — | ✓ | logo, company name/details, customer details ✓ |
+| `POS_All_Disabled` | ✗ | (may be set, ignored) | ✗ | (may be set, ignored) |
+
+### Manual test steps (assessment §4.2)
+
+1. **Visibility.** Open a session on each POS and sell something.
+   - The line icon and the *Assign Salesperson to Order* button appear only when Salesperson
+     Assignment is on.
+   - The receipt shows the branded table layout only when Customized Receipt is on.
+2. **Per line.** Add *X* and *Y*. Click the person icon on X and pick A; on Y pick B. Pay.
+   - The receipt shows A under X and B under Y.
+   - *Point of Sale › Orders › Order lines* shows the same.
+3. **Global overwrites.** Assign A and B per line, then *Assign Salesperson to Order* → C. Both
+   lines show C on screen, on the receipt and in the backend.
+4. **No assignment.** No name anywhere, and an empty column in the backend.
+5. **Change during a session.** Enable both features on an open session's POS in the backend
+   and sell without reloading. The UI and receipt are unchanged until the POS is reloaded
+   (expected POS behaviour).
+
+### Automated tests
+
+38 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
+The POS tours drive Chrome through real sales.
+
+| Module / file | Covers |
+|---|---|
+| `azk_pos_salesperson/tests/test_salesperson_backend.py` | Required name. Loads only the allowed salespersons, and none when the feature is off. Order sync stores the line and order salesperson. Access rights (POS user read, manager write). Backend views. |
+| `azk_pos_salesperson/tests/test_salesperson_receipt.py` | Receipt data and server-rendered receipt: name under the product; hidden when the feature is off or the line is unassigned. |
+| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
+| `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. Settings write-through. No name clash with native fields. |
+| `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout, native when off, customer hidden, logo fallback, basic receipt table, no duplicated company info or unit price. |
+| `azk_pos_enhanced_receipt/tests/test_both_modules.py` | Salesperson printed once, inside the enhanced table. **Tours:** test case 1 on the four configurations by name, and test case 5, each checking the **client-rendered** receipt. |
+
+```bash
+python odoo-bin -c <your.conf> -d <test_db> -i azk_pos_salesperson,azk_pos_enhanced_receipt --test-tags /azk_pos_salesperson,/azk_pos_enhanced_receipt --stop-after-init
+```
+
+The POS tours need Chrome and the Python package `websocket-client`. Without it, Odoo *skips*
+the tours.
+
+### Conflicts when both modules are installed (assessment question)
+
+Both modules extend the **same receipt** and the **same POS settings**. These are the conflicts
+that could happen, and how this design avoids them:
+
+1. **The same QWeb receipt templates are extended twice.**
+   - The salesperson module only appends inside the native `extra-info` hook of
+     `pos_orderline_receipt_information`.
+   - The enhanced receipt replaces the line loop with a table, but its Product cell **re-uses**
+     `pos_orderline_receipt_information`.
+   - So the salesperson name appears inside the table with no dependency between the modules.
+     `test_both_modules.py` verifies it.
+   - The rule that avoids this class of conflict: target stable `name`d hooks, and never
+     replace a template another addon extends.
+2. **Both patch the receipt data generator** (JS `GeneratePrinterData` and its Python mirror).
+   Each patch calls `super()` and only adds its own keys (`azk_salesperson`, `azk_enhanced`, …).
+3. **Both add settings to the same views.** Each uses its own `<setting id>`, positioned
+   relative to native anchors.
+4. **Field name clashes.** The new `pos.config` fields do not exist natively (tested). Native
+   `custom_logo`/`logo` are left untouched.
+5. **Load order.** Neither module depends on the other. If two addons ever needed to cooperate
+   more tightly, the standard resolution is a small **bridge module** (`auto_install: True`,
+   depending on both) that holds the glue code. This design does not need one.
+
+### Notes and decisions
+
+- **Odoo 20:**
+  - The POS receipt is server QWeb rendered on the client; the spec's `XmlReceipt` no longer
+    exists, so the extensions target `pos_order_receipt*`.
+  - Security uses the Odoo 20 `ir.access` format.
+  - Binary fields are `BinaryBytes`.
+- **Design calls:**
+  - the order-level salesperson, so inheritance survives reloads and offline restarts;
+  - the "No salesperson" entry;
+  - the merge rule;
+  - `Html` instead of `Text`;
+  - settings on both the POS form and the Settings page;
+  - archived salespersons stay on past orders.
