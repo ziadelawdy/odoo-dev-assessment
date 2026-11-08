@@ -7,7 +7,9 @@
     'license': 'LGPL-3',
     'depends': ['account_reports'],
     'data': [
+        'security/ir.access.csv',
         'data/dynamic_trial_balance_report.xml',
+        'wizard/dynamic_trial_balance_wizard_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

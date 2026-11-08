@@ -1,0 +1,3 @@
+id,name,model_id,group_id/id,operation,domain
+access_azk_dtb_wizard_readonly,azk.dynamic.trial.balance.wizard readonly,azk.dynamic.trial.balance.wizard,account.group_account_readonly,crud,
+access_azk_dtb_wizard_basic,azk.dynamic.trial.balance.wizard basic,azk.dynamic.trial.balance.wizard,account.group_account_basic,crud,

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="azk_dynamic_trial_balance_wizard_form" model="ir.ui.view">
+        <field name="name">azk.dynamic.trial.balance.wizard.form</field>
+        <field name="model">azk.dynamic.trial.balance.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Dynamic Trial Balance">
+                <group>
+                    <group string="Period">
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="company_id" invisible="1"/>
+                    </group>
+                    <group string="Options">
+                        <field name="posted_entries"/>
+                        <field name="include_unposted"/>
+                        <field name="hierarchy_subtotals"/>
+                        <field name="hierarchy_only_parents"/>
+                        <field name="account_level" invisible="not hierarchy_only_parents"/>
+                    </group>
+                </group>
+                <group string="Filters">
+                    <field name="account_prefixes" placeholder="e.g. 1, 40, 6100"/>
+                    <field name="journal_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                    <field name="analytic_account_ids" widget="many2many_tags" options="{'no_create': True}"
+                           groups="analytic.group_analytic_accounting"/>
+                    <field name="skip_zero_balance"/>
+                    <field name="show_amount_currency"/>
+                </group>
+                <div class="alert alert-warning" role="alert" invisible="not analytic_account_ids">
+                    With an analytic filter, only the amounts distributed to the selected analytic accounts are
+                    reported: the report is not balanced and unposted entries cannot be included.
+                </div>
+                <footer>
+                    <button name="action_preview" string="Preview" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_azk_dynamic_trial_balance_wizard" model="ir.actions.act_window">
+        <field name="name">Dynamic Trial Balance</field>
+        <field name="res_model">azk.dynamic.trial.balance.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_azk_dynamic_trial_balance"
+              name="Dynamic Trial Balance"
+              parent="account.account_reports_legal_statements_menu"
+              action="action_azk_dynamic_trial_balance_wizard"
+              groups="account.group_account_readonly,account.group_account_basic"
+              sequence="25"/>
+</odoo>
