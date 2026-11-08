@@ -4,3 +4,4 @@ from . import test_report_display
 from . import test_wizard
 from . import test_exports
 from . import test_demo_data
+from . import test_review_fixes

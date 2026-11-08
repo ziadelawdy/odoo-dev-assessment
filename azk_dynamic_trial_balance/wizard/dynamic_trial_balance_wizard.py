@@ -1,6 +1,8 @@
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
+from ..models.trial_balance_handler import PREFIX_RE
+
 LEVELS = [(str(level), str(level)) for level in range(1, 6)]
 
 
@@ -62,6 +64,20 @@ class AzkDynamicTrialBalanceWizard(models.TransientModel):
             if wizard.date_from and wizard.date_to and wizard.date_from > wizard.date_to:
                 raise ValidationError(_('The start date must be before the end date.'))
 
+    @api.constrains('account_prefixes')
+    def _check_account_prefixes(self):
+        for wizard in self:
+            invalid = [p for p in wizard._azk_prefix_list() if not PREFIX_RE.match(p)]
+            if invalid:
+                raise ValidationError(_(
+                    'Invalid account prefix: %s. Use the beginning of account codes '
+                    '(letters, digits, "." and "-"), separated by commas.', ', '.join(invalid),
+                ))
+
+    def _azk_prefix_list(self):
+        self.ensure_one()
+        return [p.strip() for p in (self.account_prefixes or '').split(',') if p.strip()]
+
     @api.constrains('analytic_account_ids')
     def _check_analytic_single_plan(self):
         for wizard in self:
@@ -78,7 +94,7 @@ class AzkDynamicTrialBalanceWizard(models.TransientModel):
         self.ensure_one()
         return {
             'journal_ids': self.journal_ids.ids,
-            'account_prefixes': [p.strip() for p in (self.account_prefixes or '').split(',') if p.strip()],
+            'account_prefixes': self._azk_prefix_list(),
             'analytic_account_ids': self.analytic_account_ids.ids,
             'skip_zero_balance': self.skip_zero_balance,
             'account_level': int(self.account_level) if self.hierarchy_only_parents and self.account_level else False,

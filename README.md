@@ -38,7 +38,7 @@ has **Debit, Credit and Balance** columns. There are three outputs:
 | Include Unposted Entries | Adds draft entries. Cancelled entries are never included. |
 | Hierarchy and Subtotals | Parent-account tree with subtotals. Odoo 20 builds the account hierarchy on `account.account.parent_id`; `account.group` no longer exists. |
 | Hierarchy Only Parents + Account Level Up To (1–5) | Keeps the tree down to the chosen depth. Deeper accounts are rolled into their nearest shown parent, so totals are unchanged. |
-| Accounts | One or more account-code prefixes, comma-separated (e.g. `1, 40`). Empty = all accounts. |
+| Accounts | One or more account-code prefixes, comma-separated (e.g. `1, 40`). Letters, digits, `.` and `-` (the characters Odoo allows in codes). Anything else is rejected. Empty = all accounts. |
 | Journals | Several journals. Empty = all. |
 | Analytic Accounts | Several analytic accounts **of one plan**. Empty = all. Visible when *Analytic Accounting* is enabled (Accounting › Settings). |
 | Skip Zero Balance | Hides accounts with zero initial balance, zero movements and zero end balance. An account whose movements cancel out (100 Dr / 100 Cr) is kept. |
@@ -109,7 +109,7 @@ account codes, journals and fiscal-year dates fit any database, and it is idempo
 
 ### Testing strategy
 
-**Automated tests**: 41 tests in `azk_dynamic_trial_balance/tests`, all passing on Odoo 20.
+**Automated tests**: 46 tests in `azk_dynamic_trial_balance/tests`, all passing on Odoo 20.
 They were written test-first (each one was seen failing before the code existed).
 
 | File | Covers |
@@ -119,6 +119,7 @@ They were written test-first (each one was seen failing before the code existed)
 | `test_report_display.py` | Skip-zero (keeps cancelling movements, drops empty parents). Hierarchy levels 1–3 keep totals. Amount-currency lines add up to the account and show their currency symbol. Parents never sum mixed currencies. Column hidden when off. |
 | `test_wizard.py` | Field-to-options mapping. Options survive re-render. Preview action. Date validation. Single-plan analytic validation. Access rights. |
 | `test_exports.py` | XLSX header (company, period, filters), numeric values equal to the report, bold total, analytic notice. PDF header filters. PDF export path (the wkhtmltopdf call is stubbed: inside a test transaction it would fetch its CSS from the same blocked server). Wizard export actions. A real PDF and XLSX were also generated from the demo database with the server running. |
+| `test_review_fixes.py` | Regressions from the independent code review: unfolded accounts (partner / journal-item sub-lines) never inflate the total, with and without Amount Currency. Expanding one account never adds Undistributed P/L lines. Prefixes with `-`. The wizard rejects invalid prefixes. Comparison periods are not offered. |
 | `test_demo_data.py` | Demo loader content and idempotency. Per-account parity with native over the demo data, with and without hierarchy. Total debit = total credit. |
 
 Run them:
@@ -183,6 +184,9 @@ python odoo-bin shell -c <your.conf> -d <db> --no-http < azk_dynamic_trial_balan
 ```
 
 ### Known limitations
+
+- Single period by design: the native *Comparison* filter is not offered.
+- With *Unfold All*, the native report omits its *Cumulative Translation Adjustment* line (multi-currency companies). This report inherits that behaviour.
 
 - With an analytic filter, the *Amount Currency* column shows the journal item's full foreign
   amount (the analytic shadow table carries `amount_currency` unprorated).

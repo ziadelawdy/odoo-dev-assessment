@@ -6,6 +6,8 @@
         <field name="filter_journals" eval="False"/>
         <field name="filter_analytic_groupby" eval="False"/>
         <field name="filter_growth_comparison" eval="False"/>
+        <!-- Comparison periods are out of scope (single period by design) -->
+        <field name="filter_period_comparison" eval="False"/>
         <field name="filter_multi_company">selector</field>
         <field name="filter_unfold_all" eval="True"/>
         <field name="filter_hierarchy">by_default</field>

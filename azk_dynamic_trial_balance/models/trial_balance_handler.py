@@ -7,9 +7,10 @@ from odoo.tools import SQL
 
 SPLIT_SECTIONS = ('initial_balance', 'end_balance')
 ACCOUNT_LEVEL_MARKUPS = ('undistributed_profits_losses', 'cumulative_translation_adjustment')
-# Account prefixes are matched with '=like'; only plain code characters are
-# accepted so '%' / '_' wildcards (or anything else) can never be injected.
-PREFIX_RE = re.compile(r'^[0-9A-Za-z.]+$')
+# Account prefixes are matched with '=like'; only the characters Odoo allows in
+# account codes (account.account ACCOUNT_CODE_REGEX: letters, digits, '.', '-')
+# are accepted, so the '%' / '_' wildcards can never be injected.
+PREFIX_RE = re.compile(r'^[0-9A-Za-z.\-]+$')
 AZK_TB_DEFAULTS = {
     'journal_ids': [],
     'account_prefixes': [],
@@ -288,12 +289,19 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
     # Lines
     # ------------------------------------------------------------------
     def _custom_line_postprocessor(self, report, options, lines):
+        # Same check as the native handler: the full report render starts with
+        # the root report line; expansions of a single line (get_expanded_lines)
+        # must not receive report-level lines such as Undistributed P/L.
+        is_report_render = bool(lines) and report._parse_line_id(lines[0].id)[-1] == (
+            '', 'account.report.line', report.line_ids[0].id,
+        )
         lines = super()._custom_line_postprocessor(report, options, lines)
         if not lines:
             return lines
-        if (options.get('azk_tb') or {}).get('account_prefixes'):
+        azk_tb = options.get('azk_tb') or {}
+        if is_report_render and azk_tb.get('account_prefixes'):
             lines = self._azk_apply_prefixes_to_earnings_lines(report, options, lines)
-        if (options.get('azk_tb') or {}).get('show_amount_currency'):
+        if is_report_render and azk_tb.get('show_amount_currency'):
             lines = self._azk_split_lines_by_currency(report, options, lines)
 
         # The native postprocessor moves the report total to the end and tags
@@ -428,16 +436,24 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
             currencies_by_account[account_id].append(currency_id)
 
         new_lines = []
+        replaced_ids = set()
         for line in lines:
+            if line.parent_id in replaced_ids:
+                # sub-lines (partner, journal item...) of an account that is now
+                # shown per currency: their parent line no longer exists
+                replaced_ids.add(line.id)
+                continue
             account_id = report._get_res_id_from_line_id(line.id, 'account.account')
             markup = report._get_markup(line.id)
-            if not account_id or markup in ('parent_account', *ACCOUNT_LEVEL_MARKUPS) or account_id not in currencies_by_account:
+            is_account_line = report._parse_line_id(line.id)[-1][1] == 'account.account' and markup != 'parent_account'
+            if not is_account_line or account_id not in currencies_by_account:
                 for column in line.columns:
                     if column.expression_label == 'amount_currency':
                         column.no_format = None
                         column.is_zero = True
                 new_lines.append(line)
                 continue
+            replaced_ids.add(line.id)
             for currency_id in currencies_by_account[account_id]:
                 new_lines.append(self._azk_currency_line(report, options, line, currency_id, data[(account_id, currency_id)]))
         return new_lines
@@ -485,13 +501,15 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         """True for the lines that carry an account balance: accounts (not
         hierarchy parents), Undistributed Profits/Losses and the CTA line."""
         markup = report._get_markup(line.id)
-        if markup in ACCOUNT_LEVEL_MARKUPS:
+        if markup in ACCOUNT_LEVEL_MARKUPS or markup == 'azk_currency':
             return True
         # hierarchy parents, and the section totals added below them when the
         # company uses "totals below sections" (their id embeds the account)
         if markup in ('parent_account', 'total'):
             return False
-        return bool(report._get_res_id_from_line_id(line.id, 'account.account'))
+        # Only the account line itself: sub-lines of an unfolded account
+        # (partner, journal item...) also embed the account id in their path.
+        return report._parse_line_id(line.id)[-1][1] == 'account.account'
 
     @api.model
     def _azk_columns_by_block(self, options, line):
