@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Header: company name/details after the logo; native customer block replaced. -->
+    <template id="pos_order_receipt_header_enhanced" inherit_id="point_of_sale.pos_order_receipt_header">
+        <xpath expr="//div[@name='logo']" position="after">
+            <div t-if="conditions.get('azk_enhanced')" class="azk-company w-100 text-center mb-2">
+                <div t-if="extra_data.get('azk_company_name')" class="azk-company-name text-large fw-bold" t-out="extra_data['azk_company_name']"/>
+                <div t-if="extra_data.get('azk_company_details')" class="azk-company-details text-small" t-out="extra_data['azk_company_details']"/>
+            </div>
+            <div t-if="conditions.get('azk_show_customer') and extra_data.get('azk_customer')" class="azk-customer w-100 text-start mb-2 text-small">
+                <div class="fw-bold">Customer: <span t-out="extra_data['azk_customer']['name']"/></div>
+                <div t-foreach="extra_data['azk_customer']['address_lines']" t-as="address_line" t-out="address_line"/>
+            </div>
+        </xpath>
+        <xpath expr="//div[@name='partner_info']" position="attributes">
+            <attribute name="t-if">not conditions.get('azk_enhanced')</attribute>
+        </xpath>
+    </template>
+
+    <!-- Lines: one table (Product | Qty | Price | Total) instead of the per-line tables. -->
+    <template id="pos_order_receipt_enhanced" inherit_id="point_of_sale.pos_order_receipt">
+        <xpath expr="//table[@t-foreach='lines']" position="attributes">
+            <attribute name="t-if">not conditions.get('azk_enhanced')</attribute>
+        </xpath>
+        <xpath expr="//table[@t-foreach='lines']" position="after">
+            <table t-if="conditions.get('azk_enhanced')" class="azk-lines-table w-100">
+                <thead>
+                    <tr>
+                        <th class="text-start">Product</th>
+                        <th class="text-end">Qty</th>
+                        <th t-if="not conditions['basic_receipt']" class="text-end">Price</th>
+                        <th t-if="not conditions['basic_receipt']" class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="lines" t-as="line" class="azk-line" t-att-class="{'azk-combo-child': line['combo_parent_id']}">
+                        <td class="text-start top azk-product-cell">
+                            <t t-set="azk_table_mode" t-value="True"/>
+                            <t t-call="point_of_sale.pos_orderline_receipt_information"/>
+                        </td>
+                        <td class="text-end top" t-out="line['qty']"/>
+                        <t t-if="not conditions['basic_receipt']">
+                            <td class="text-end top font-monospace">
+                                <t t-if="not line['combo_parent_id'] and not line['is_service_fee_line']" t-out="line['unit_price']"/>
+                            </td>
+                            <td class="text-end top font-monospace">
+                                <t t-if="not line['combo_parent_id']" t-out="line['price_subtotal_incl']"/>
+                            </td>
+                        </t>
+                    </tr>
+                </tbody>
+            </table>
+        </xpath>
+    </template>
+
+    <!-- The unit price lives in the Price column of the table. -->
+    <template id="pos_orderline_receipt_information_enhanced" inherit_id="point_of_sale.pos_orderline_receipt_information">
+        <xpath expr="//span[@name='standard-unit-price']" position="attributes">
+            <attribute name="t-if" add="not azk_table_mode" separator=" and "/>
+        </xpath>
+    </template>
+
+    <!-- Receipt styles: the receipt is rendered in its own document, styled by this template. -->
+    <template id="pos_order_receipt_style_enhanced" inherit_id="point_of_sale.pos_order_receipt_style">
+        <xpath expr="//style" position="inside">
+            .azk-lines-table { border-collapse: collapse; }
+            .azk-lines-table th { border-bottom: 1px solid #000; padding: 2px 4px; font-weight: bold; }
+            .azk-lines-table td { padding: 3px 4px; border-bottom: 1px dashed #bbb; }
+            .azk-lines-table .azk-combo-child .azk-product-cell { padding-left: 16px; }
+            .azk-company-name p, .azk-company-details p { margin: 0; }
+        </xpath>
+    </template>
+
+    <!-- Company info is printed at the top in enhanced mode: hide the footer copy. -->
+    <template id="pos_order_receipt_footer_enhanced" inherit_id="point_of_sale.pos_order_receipt_footer">
+        <xpath expr="//t[@t-call='point_of_sale.company_info_receipt']" position="attributes">
+            <attribute name="t-if">not conditions.get('azk_enhanced')</attribute>
+        </xpath>
+    </template>
+</odoo>

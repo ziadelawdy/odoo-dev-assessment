@@ -8,7 +8,13 @@
     'depends': ['point_of_sale'],
     'data': [
         'views/pos_config_views.xml',
+        'receipt/pos_order_receipt.xml',
     ],
+    'assets': {
+        'point_of_sale._assets_pos': [
+            'azk_pos_enhanced_receipt/static/src/**/*',
+        ],
+    },
     'installable': True,
     'application': False,
 }
