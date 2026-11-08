@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_order_line_salesperson" model="ir.ui.view">
+        <field name="name">pos.order.line.list.salesperson</field>
+        <field name="model">pos.order.line</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_line"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="salesperson_id" optional="show" readonly="1"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_pos_order_all_sales_lines_salesperson" model="ir.ui.view">
+        <field name="name">pos.order.line.all.sales.list.salesperson</field>
+        <field name="model">pos.order.line</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_tree_all_sales_lines"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="salesperson_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_pos_pos_form_salesperson" model="ir.ui.view">
+        <field name="name">pos.order.form.salesperson</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group//field[@name='partner_id']" position="after">
+                <field name="salesperson_id" readonly="1" invisible="not salesperson_id"/>
+            </xpath>
+            <xpath expr="//field[@name='lines']/list//field[@name='full_product_name']" position="after">
+                <field name="salesperson_id" optional="show" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

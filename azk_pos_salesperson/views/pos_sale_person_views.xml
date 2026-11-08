@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_sale_person_view_list" model="ir.ui.view">
+        <field name="name">pos.sale.person.list</field>
+        <field name="model">pos.sale.person</field>
+        <field name="arch" type="xml">
+            <list string="Salespersons">
+                <field name="name"/>
+                <field name="phone_number"/>
+                <field name="employee_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="pos_sale_person_view_form" model="ir.ui.view">
+        <field name="name">pos.sale.person.form</field>
+        <field name="model">pos.sale.person</field>
+        <field name="arch" type="xml">
+            <form string="Salesperson">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Ahmed Hassan"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="phone_number" widget="phone"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="pos_sale_person_view_search" model="ir.ui.view">
+        <field name="name">pos.sale.person.search</field>
+        <field name="model">pos.sale.person</field>
+        <field name="arch" type="xml">
+            <search string="Salespersons">
+                <field name="name"/>
+                <field name="phone_number"/>
+                <field name="employee_id"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pos_sale_person" model="ir.actions.act_window">
+        <field name="name">Salespersons</field>
+        <field name="res_model">pos.sale.person</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a salesperson</p>
+            <p>Salespersons can be assigned to order lines in the Point of Sale.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_pos_sale_person"
+              name="Salespersons"
+              parent="point_of_sale.menu_point_config_product"
+              action="action_pos_sale_person"
+              sequence="40"
+              groups="point_of_sale.group_pos_manager"/>
+</odoo>
