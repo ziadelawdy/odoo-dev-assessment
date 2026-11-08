@@ -11,10 +11,16 @@
         'views/pos_sale_person_views.xml',
         'views/pos_config_views.xml',
         'views/pos_order_views.xml',
+        'receipt/pos_order_receipt.xml',
     ],
     'demo': [
         'demo/pos_sale_person_demo.xml',
     ],
+    'assets': {
+        'point_of_sale._assets_pos': [
+            'azk_pos_salesperson/static/src/**/*',
+        ],
+    },
     'installable': True,
     'application': False,
 }
