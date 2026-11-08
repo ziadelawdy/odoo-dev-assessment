@@ -9,6 +9,11 @@
     'data': [
         'data/dynamic_trial_balance_report.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'azk_dynamic_trial_balance/static/src/components/**/*',
+        ],
+    },
     'installable': True,
     'application': False,
 }

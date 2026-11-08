@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="azk_dynamic_trial_balance.warning_filter_summary">
+        <strong>Dynamic Trial Balance filters:</strong>
+        <t t-esc="warningParams['summary']"/>.
+        Re-open the Dynamic Trial Balance wizard to change them.
+    </t>
+
+    <t t-name="azk_dynamic_trial_balance.warning_analytic_unbalanced">
+        An analytic filter is applied: only the amounts distributed to the selected analytic accounts are reported.
+        Accounts without analytic distribution (bank, receivable, payable, taxes...) are excluded,
+        so this report is intentionally not balanced.
+    </t>
+</templates>
