@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_config_view_form_enhanced_receipt" model="ir.ui.view">
+        <field name="name">pos.config.form.enhanced.receipt</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='multiple_employee_session']" position="after">
+                <setting id="azk_customized_receipt"
+                         string="Customized Receipt"
+                         help="Logo, company info, customer details and a products table on the receipt">
+                    <field name="use_customized_receipt"/>
+                    <div class="content-group mt16" invisible="not use_customized_receipt">
+                        <div class="row mt8">
+                            <label for="receipt_logo" class="col-lg-4 o_light_label"/>
+                            <field name="receipt_logo" widget="image" class="oe_avatar" options="{'size': [0, 80]}"/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="company_name" class="col-lg-4 o_light_label"/>
+                            <field name="company_name" placeholder="e.g. NOX Trading Co."/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="company_details" class="col-lg-4 o_light_label"/>
+                            <field name="company_details" placeholder="Address, phone, VAT..."/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="show_customer_details" class="col-lg-4 o_light_label"/>
+                            <field name="show_customer_details"/>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="res_config_settings_view_form_enhanced_receipt" model="ir.ui.view">
+        <field name="name">res.config.settings.form.pos.enhanced.receipt</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='pos_bills_and_receipts_section']" position="inside">
+                <setting id="azk_pos_customized_receipt"
+                         string="Customized Receipt"
+                         help="Logo, company info, customer details and a products table on the receipt">
+                    <field name="pos_use_customized_receipt"/>
+                    <div class="content-group mt16" invisible="not pos_use_customized_receipt">
+                        <div class="row mt8">
+                            <label for="pos_receipt_logo" class="col-lg-4 o_light_label"/>
+                            <field name="pos_receipt_logo" widget="image" class="oe_avatar" options="{'size': [0, 80]}"/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="pos_company_name" class="col-lg-4 o_light_label"/>
+                            <field name="pos_company_name" placeholder="e.g. NOX Trading Co."/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="pos_company_details" class="col-lg-4 o_light_label"/>
+                            <field name="pos_company_details" placeholder="Address, phone, VAT..."/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="pos_show_customer_details" class="col-lg-4 o_light_label"/>
+                            <field name="pos_show_customer_details"/>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

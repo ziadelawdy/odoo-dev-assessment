@@ -1,0 +1,23 @@
+from odoo import fields, models
+
+
+class PosConfig(models.Model):
+    _inherit = 'pos.config'
+
+    use_customized_receipt = fields.Boolean(
+        string='Customized Receipt',
+        help='Print receipts with the layout below (logo, company info, customer, lines table). '
+             'When disabled, the standard Odoo receipt is used.',
+    )
+    receipt_logo = fields.Image(
+        string='Receipt Logo', max_width=512, max_height=512,
+        help='Printed at the top of the customized receipt. Falls back to the standard logo when empty.',
+    )
+    # Html (sanitized) rather than Text: the spec allows HTML, and Odoo's
+    # sanitizer strips scripts / event handlers before anything is rendered.
+    company_name = fields.Html(string='Receipt Company Name', sanitize=True)
+    company_details = fields.Html(string='Receipt Company Details', sanitize=True)
+    show_customer_details = fields.Boolean(
+        string='Show Customer Details',
+        help="Print the customer's name and address on the customized receipt.",
+    )
