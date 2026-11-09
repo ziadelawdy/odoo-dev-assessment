@@ -6,6 +6,10 @@
             <div t-if="conditions.get('azk_enhanced')" class="azk-company w-100 text-center mb-2">
                 <div t-if="extra_data.get('azk_company_name')" class="azk-company-name text-large fw-bold" t-out="extra_data['azk_company_name']"/>
                 <div t-if="extra_data.get('azk_company_details')" class="azk-company-details text-small" t-out="extra_data['azk_company_details']"/>
+                <!-- The footer company block is hidden in enhanced mode: keep the legal tax ID here. -->
+                <div t-if="company.get('vat')" class="azk-company-vat text-small">
+                    <t t-out="extra_data.get('vat_label') or 'Tax ID'"/>: <t t-out="company['vat']"/>
+                </div>
             </div>
             <div t-if="conditions.get('azk_show_customer') and extra_data.get('azk_customer')" class="azk-customer w-100 text-start mb-2 text-small">
                 <div class="fw-bold">Customer: <span t-out="extra_data['azk_customer']['name']"/></div>

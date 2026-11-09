@@ -1,3 +1,4 @@
 id,name,model_id,group_id/id,operation,domain
 access_pos_sale_person_user,pos.sale.person user,pos.sale.person,point_of_sale.group_pos_user,r,
 access_pos_sale_person_manager,pos.sale.person manager,pos.sale.person,point_of_sale.group_pos_manager,crud,
+rule_pos_sale_person_multi_company,pos.sale.person multi-company,pos.sale.person,,crud,"[('company_id', 'in', company_ids + [False])]"

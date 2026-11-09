@@ -9,6 +9,6 @@ class PosConfig(models.Model):
         help='Assign salespersons to order lines in this Point of Sale and print them on the receipt.',
     )
     allowed_sale_person_ids = fields.Many2many(
-        'pos.sale.person', string='Allowed Salespersons',
+        'pos.sale.person', string='Allowed Salespersons', check_company=True,
         help='Salespersons available for assignment in this Point of Sale.',
     )

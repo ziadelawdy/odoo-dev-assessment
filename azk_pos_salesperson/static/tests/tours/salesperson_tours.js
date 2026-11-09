@@ -4,6 +4,10 @@ import * as ProductScreen from "@point_of_sale/../tests/pos/tours/utils/product_
 import * as PaymentScreen from "@point_of_sale/../tests/pos/tours/utils/payment_screen_util";
 import * as FeedbackScreen from "@point_of_sale/../tests/pos/tours/utils/feedback_screen_util";
 import * as combo from "@point_of_sale/../tests/pos/tours/utils/combo_popup_util";
+import * as TicketScreen from "@point_of_sale/../tests/pos/tours/utils/ticket_screen_util";
+import * as Order from "@point_of_sale/../tests/generic_helpers/order_widget_util";
+import * as Numpad from "@point_of_sale/../tests/generic_helpers/numpad_util";
+import { inLeftSide } from "@point_of_sale/../tests/pos/tours/utils/common";
 import { negate, refresh } from "@point_of_sale/../tests/generic_helpers/utils";
 import { registry } from "@web/core/registry";
 
@@ -188,5 +192,68 @@ registry.category("web_tour.tours").add("AzkSalespersonHiddenTour", {
             },
             pay(),
             Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+// ---------------------------------------------------------------------------
+// Review fixes
+// ---------------------------------------------------------------------------
+
+registry.category("web_tour.tours").add("AzkSalespersonComboEditTour", {
+    steps: () =>
+        [
+            open(),
+            assignOrder("Salesperson C"),
+            ProductScreen.clickDisplayedProduct("Office Combo"),
+            combo.select("Combo Product 3"),
+            combo.select("Combo Product 5"),
+            combo.select("Combo Product 8"),
+            Dialog.confirm(),
+            lineShows("Combo Product 3", "Salesperson C"),
+            // edit the combo: its children are re-created by the native edit flow
+            ProductScreen.longPressOrderline("Office Combo"),
+            combo.select("Combo Product 2"),
+            Dialog.confirm(),
+            lineShows("Combo Product 2", "Salesperson C"),
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonRefundTour", {
+    steps: () =>
+        [
+            open(),
+            assignOrder("Salesperson A"),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            pay(),
+            FeedbackScreen.clickNextOrder(),
+            Chrome.clickOrders(),
+            TicketScreen.isReady(),
+            TicketScreen.selectFilter("Paid"),
+            TicketScreen.selectOrder("001"),
+            inLeftSide([
+                ...Order.hasLine({ productName: "Whiteboard Pen", withClass: ".selected" }),
+                Numpad.click("1"),
+            ]),
+            TicketScreen.confirmRefund(),
+            PaymentScreen.isShown(),
+            PaymentScreen.clickPaymentMethod("Bank"),
+            PaymentScreen.clickValidate(),
+            FeedbackScreen.isShown(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonSmallScreenTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            ProductScreen.clickReview(),
+            ProductScreen.clickControlButtonMore(),
+            assignOrder("Salesperson A"),
+            // the "more" dialog closes after the choice: check the result on the cart line
+            lineShows("Whiteboard Pen", "Salesperson A"),
         ].flat(Infinity),
 });

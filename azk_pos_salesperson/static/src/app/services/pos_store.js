@@ -17,4 +17,20 @@ patch(PosStore.prototype, {
         }
         return line;
     },
+    /**
+     * Editing a combo (long press) re-creates its children through this method:
+     * credit the new children to the salesperson of the edited line.
+     */
+    async handleComboProduct(values, order, configure, opts = {}) {
+        const result = await super.handleComboProduct(...arguments);
+        const person = opts.line?.salesperson_id;
+        if (result !== false && person && Array.isArray(values.combo_line_ids)) {
+            for (const command of values.combo_line_ids) {
+                if (Array.isArray(command) && command[0] === "create" && command[1]) {
+                    command[1].salesperson_id = person;
+                }
+            }
+        }
+        return result;
+    },
 });

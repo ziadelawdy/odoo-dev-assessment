@@ -10,10 +10,11 @@ class PosSalePerson(models.Model):
     _description = 'POS Salesperson'
     _inherit = ['pos.load.mixin']
     _order = 'name'
+    _check_company_auto = True
 
     name = fields.Char(required=True)
     phone_number = fields.Char(string='Phone Number')
-    employee_id = fields.Many2one('hr.employee', string='Related Employee', ondelete='set null')
+    employee_id = fields.Many2one('hr.employee', string='Related Employee', ondelete='set null', check_company=True)
     active = fields.Boolean(default=True)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
 
@@ -22,8 +23,13 @@ class PosSalePerson(models.Model):
         config = data['pos.config']
         if not config.active_salesperson_feature:
             return [('id', '=', False)]
-        return [('id', 'in', config.allowed_sale_person_ids.ids)]
+        return [
+            ('id', 'in', config.allowed_sale_person_ids.ids),
+            ('company_id', 'in', [False, config.company_id.id]),
+        ]
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ['id', 'name', 'phone_number', 'employee_id']
+        # employee_id stays backend-only: loading it would pull hr.employee
+        # records (pos_hr cashiers) into the POS store.
+        return ['id', 'name', 'phone_number']

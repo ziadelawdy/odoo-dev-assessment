@@ -10,5 +10,15 @@
                 <span t-else="">Assign Salesperson to Order</span>
             </button>
         </xpath>
+        <!-- Small screens: the main bar is not rendered, buttons live in the "more" dialog -->
+        <xpath expr="//t[@t-if='(this.pos.isSmallProductScreen and this.props.showRemainingButtons)']/InternalNoteButton" position="after">
+            <button t-if="this.pos.config.active_salesperson_feature"
+                    class="azk-assign-order-salesperson btn btn-secondary btn-lg lh-lg text-truncate"
+                    t-on-click="() => this.azkAssignOrderSalesperson()">
+                <i class="fa fa-users me-1" aria-hidden="true"/>
+                <span t-if="this.pos.getOrder()?.salesperson_id" t-out="this.pos.getOrder().salesperson_id.name"/>
+                <span t-else="">Assign Salesperson to Order</span>
+            </button>
+        </xpath>
     </t>
 </templates>

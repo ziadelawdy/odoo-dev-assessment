@@ -61,6 +61,14 @@ class TestEnhancedReceipt(AzkEnhancedReceiptCommon):
         html = self._render(self._sync_order([(self.product_x, 1)]))
         self.assertNotIn('name="company_info"', html, 'native footer company block is hidden in enhanced mode')
 
+    def test_company_vat_kept_in_enhanced_mode(self):
+        """Review fix: hiding the footer company block must not drop the legal tax ID."""
+        self.env.company.vat = 'EG123456789'
+        self._enable(company_details='<p>No VAT written here</p>')
+        html = self._render(self._sync_order([(self.product_x, 1)]))
+        self.assertIn('EG123456789', html)
+        self.assertEqual(html.count('EG123456789'), 1, 'printed once')
+
     def test_unit_price_not_duplicated_in_table(self):
         self._enable()
         html = self._render(self._sync_order([(self.product_x, 3)]))
