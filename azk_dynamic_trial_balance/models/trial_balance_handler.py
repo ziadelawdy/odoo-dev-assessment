@@ -12,7 +12,6 @@ ACCOUNT_LEVEL_MARKUPS = ('undistributed_profits_losses', 'cumulative_translation
 # are accepted, so the '%' / '_' wildcards can never be injected.
 PREFIX_RE = re.compile(r'^[0-9A-Za-z.\-]+$')
 AZK_TB_DEFAULTS = {
-    'journal_ids': [],
     'account_prefixes': [],
     'analytic_account_ids': [],
     'skip_zero_balance': False,
@@ -81,8 +80,6 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         options['azk_tb'] = azk_tb
 
         base_domain = list(options.get('forced_domain') or [])
-        if azk_tb['journal_ids']:
-            base_domain.append(('journal_id', 'in', azk_tb['journal_ids']))
         prefixes = azk_tb['account_prefixes']
         prefix_domain = ['|'] * (len(prefixes) - 1) + [
             ('account_id.code', '=like', f'{prefix}%') for prefix in prefixes
@@ -101,6 +98,14 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         # PDF header: native filters + period, wizard filters and analytic notice
         pdf_templates = options.setdefault('custom_display_config', {}).setdefault('pdf_export', {})
         pdf_templates['pdf_export_filters'] = 'azk_dynamic_trial_balance.pdf_export_filters'
+
+        # In-report filter bar (switches for the wizard options) and visible PDF / XLSX buttons
+        options['custom_display_config'].setdefault('components', {})['AccountReportFilters'] = 'AzkTrialBalanceFilters'
+        for button in options.get('buttons', []):
+            if button.get('action') == 'export_file' and button.get('action_param') == 'export_to_pdf':
+                button.update(name=_('PDF'), always_show=True)
+            elif button.get('action') == 'export_file' and button.get('action_param') == 'export_to_xlsx':
+                button.update(name=_('XLSX'), always_show=True)
 
     @api.model
     def _azk_init_amount_currency_column(self, options, show):
@@ -202,7 +207,6 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
         level = int(level) if str(level).isdigit() and 1 <= int(level) <= 5 else False
         return {
             **AZK_TB_DEFAULTS,
-            'journal_ids': int_list(raw.get('journal_ids')),
             'account_prefixes': prefixes,
             'analytic_account_ids': int_list(raw.get('analytic_account_ids')),
             'skip_zero_balance': bool(raw.get('skip_zero_balance')),
@@ -225,9 +229,6 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
     @api.model
     def _azk_filter_summary(self, azk_tb):
         parts = []
-        if azk_tb.get('journal_ids'):
-            journals = self.env['account.journal'].browse(azk_tb['journal_ids']).exists()
-            parts.append(_('Journals: %s', ', '.join(journals.mapped('name'))))
         if azk_tb.get('account_prefixes'):
             parts.append(_('Account prefixes: %s', ', '.join(azk_tb['account_prefixes'])))
         if azk_tb.get('analytic_account_ids'):
@@ -273,6 +274,9 @@ class AzkDynamicTrialBalanceReportHandler(models.AbstractModel):
             _('Period: %(date_from)s - %(date_to)s', date_from=options['date']['date_from'], date_to=options['date']['date_to']),
             _('Unposted entries included') if options.get('all_entries') else None,
         ]
+        selected_journals = [journal['name'] for journal in options.get('journals', []) if journal.get('selected')]
+        if selected_journals:
+            lines.append(_('Journals: %s', ', '.join(selected_journals)))
         summary = self._azk_filter_summary(options.get('azk_tb') or {})
         if summary:
             lines.append(_('Filters: %s', summary))

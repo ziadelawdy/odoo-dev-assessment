@@ -19,6 +19,9 @@
         'web.assets_backend': [
             'azk_dynamic_trial_balance/static/src/components/**/*',
         ],
+        'web.assets_tests': [
+            'azk_dynamic_trial_balance/static/tests/tours/**/*',
+        ],
     },
     'installable': True,
     'application': False,

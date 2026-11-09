@@ -3,7 +3,6 @@
     <t t-name="azk_dynamic_trial_balance.warning_filter_summary">
         <strong>Dynamic Trial Balance filters:</strong>
         <t t-esc="warningParams['summary']"/>.
-        Re-open the Dynamic Trial Balance wizard to change them.
     </t>
 
     <t t-name="azk_dynamic_trial_balance.warning_analytic_unbalanced">

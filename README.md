@@ -39,7 +39,7 @@ has **Debit, Credit and Balance** columns. There are three outputs:
 | Hierarchy and Subtotals | Parent-account tree with subtotals. Odoo 20 builds the account hierarchy on `account.account.parent_id`; `account.group` no longer exists. |
 | Hierarchy Only Parents + Account Level Up To (1–5) | Keeps the tree down to the chosen depth. Deeper accounts are rolled into their nearest shown parent, so totals are unchanged. |
 | Accounts | One or more account-code prefixes, comma-separated (e.g. `1, 40`). Letters, digits, `.` and `-` (the characters Odoo allows in codes). Anything else is rejected. Empty = all accounts. |
-| Journals | Several journals. Empty = all. |
+| Journals | Several journals. Empty = all. They are passed to the native Journals filter of the report. |
 | Analytic Accounts | Several analytic accounts **of one plan**. Empty = all. Visible when *Analytic Accounting* is enabled (Accounting › Settings). |
 | Skip Zero Balance | Hides accounts with zero initial balance, zero movements and zero end balance. An account whose movements cancel out (100 Dr / 100 Cr) is kept. |
 | Show Amount Currency | Splits each account into one line per transaction currency, with an *Amount Currency* column (end balance in that currency, with its symbol). |
@@ -79,9 +79,17 @@ On top of the engine:
      visible notice says so on screen, in the PDF and in the XLSX.
    - Analytic lines only exist for posted entries.
 4. **One line per account and company.** With several companies selected, Odoo's default *consolidation* regroups the trial balance by account code (accounts become hidden sub-lines). This report turns consolidation off, because every feature here (prefixes, hierarchy, currencies, skip-zero) works on real account lines. The numbers equal the native report with consolidation off.
-5. **Preview filters.** Native filters (dates, draft, hierarchy, search, companies) stay
-   editable in the report. The wizard-only filters are shown as a read-only summary banner.
-   To change them, re-open the wizard.
+5. **Filters editable in the report.** The report has its own filter bar (a custom
+   `AccountReportFilters` component, the same mechanism native reports use). It contains:
+   - an *Accounts* prefix field;
+   - switches for *Unposted Entries*, *Hierarchy and Subtotals*, *Only Parents* (with a level
+     selector from 1 to 5), *Skip Zero Balance* and *Amount Currency*;
+   - Odoo's native *Journals* dropdown and date filter;
+   - **PDF** and **XLSX** buttons.
+
+   Every change reloads the report immediately and survives a refresh. Only the analytic
+   accounts are chosen in the wizard; they appear in the summary banner. The report can also
+   be opened directly from the client action `action_azk_dynamic_trial_balance_report`.
 
 ### Installation
 
@@ -109,7 +117,7 @@ account codes, journals and fiscal-year dates fit any database, and it is idempo
 
 ### Testing strategy
 
-**Automated tests**: 46 tests in `azk_dynamic_trial_balance/tests`, all passing on Odoo 20.
+**Automated tests**: 51 tests in `azk_dynamic_trial_balance/tests`, all passing on Odoo 20.
 They were written test-first (each one was seen failing before the code existed).
 
 | File | Covers |
@@ -120,6 +128,7 @@ They were written test-first (each one was seen failing before the code existed)
 | `test_wizard.py` | Field-to-options mapping. Options survive re-render. Preview action. Date validation. Single-plan analytic validation. Access rights. |
 | `test_exports.py` | XLSX header (company, period, filters), numeric values equal to the report, bold total, analytic notice. PDF header filters. PDF export path (the wkhtmltopdf call is stubbed: inside a test transaction it would fetch its CSS from the same blocked server). Wizard export actions. A real PDF and XLSX were also generated from the demo database with the server running. |
 | `test_review_fixes.py` | Regressions from the independent code review: unfolded accounts (partner / journal-item sub-lines) never inflate the total, with and without Amount Currency. Expanding one account never adds Undistributed P/L lines. Prefixes with `-`. The wizard rejects invalid prefixes. Comparison periods are not offered. |
+| `test_report_filter_bar.py` | Filter bar component registered. PDF/XLSX buttons in the bar. Native journal filter, also fed by the wizard. **Tour:** every switch, the prefix field and the level selector update the report. |
 | `test_demo_data.py` | Demo loader content and idempotency. Per-account parity with native over the demo data, with and without hierarchy. Total debit = total credit. |
 
 Run them:

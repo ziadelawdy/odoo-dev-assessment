@@ -93,7 +93,6 @@ class AzkDynamicTrialBalanceWizard(models.TransientModel):
     def _azk_tb_values(self):
         self.ensure_one()
         return {
-            'journal_ids': self.journal_ids.ids,
             'account_prefixes': self._azk_prefix_list(),
             'analytic_account_ids': self.analytic_account_ids.ids,
             'skip_zero_balance': self.skip_zero_balance,
@@ -118,6 +117,8 @@ class AzkDynamicTrialBalanceWizard(models.TransientModel):
             'hierarchy': self.hierarchy_subtotals or self.hierarchy_only_parents,
             'unfold_all': False,
             'azk_tb': self._azk_tb_values(),
+            # journals use the native report journal filter (editable in the report)
+            'journals': [{'id': journal_id, 'selected': True} for journal_id in self.journal_ids.ids],
         })
 
     def action_preview(self):
