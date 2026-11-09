@@ -3,7 +3,7 @@
     <record id="dynamic_trial_balance_report" model="account.report">
         <field name="name">Dynamic Trial Balance</field>
         <field name="groupby">account_id</field>
-        <field name="filter_journals" eval="False"/>
+        <field name="filter_journals" eval="True"/>
         <field name="filter_analytic_groupby" eval="False"/>
         <field name="filter_growth_comparison" eval="False"/>
         <!-- Comparison periods are out of scope (single period by design) -->
@@ -75,5 +75,11 @@
                 </field>
             </record>
         </field>
+    </record>
+    <!-- Opens the report directly (the wizard Preview opens it with preset options) -->
+    <record id="action_azk_dynamic_trial_balance_report" model="ir.actions.client">
+        <field name="name">Dynamic Trial Balance</field>
+        <field name="tag">account_report</field>
+        <field name="context" eval="{'report_id': ref('dynamic_trial_balance_report')}"/>
     </record>
 </odoo>

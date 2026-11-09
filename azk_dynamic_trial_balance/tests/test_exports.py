@@ -14,8 +14,9 @@ LABEL_ORDER = ('debit', 'credit', 'balance')
 @tagged('post_install', '-at_install')
 class TestExports(AzkTBCommon):
 
-    def _filtered_options(self, **azk_tb):
-        return self._options(self.report, '2017-01-01', '2017-12-31', azk_tb=azk_tb)
+    def _filtered_options(self, journals=(), **azk_tb):
+        extra = {'journals': [{'id': j, 'selected': True} for j in journals]} if journals else {}
+        return self._options(self.report, '2017-01-01', '2017-12-31', azk_tb=azk_tb, **extra)
 
     def _xlsx_sheet(self, options):
         content = self.report.export_to_xlsx(options)['file_content']
@@ -30,7 +31,7 @@ class TestExports(AzkTBCommon):
 
     def test_xlsx_header(self):
         sale = self.company_data['default_journal_sale']
-        sheet = self._xlsx_sheet(self._filtered_options(journal_ids=[sale.id]))
+        sheet = self._xlsx_sheet(self._filtered_options(journals=[sale.id]))
         header = self._header_text(sheet)
         self.assertIn(self.company_data['company'].name, header)
         self.assertIn('2017-01-01', header)
@@ -79,7 +80,7 @@ class TestExports(AzkTBCommon):
 
     def test_pdf_header_contains_filters(self):
         sale = self.company_data['default_journal_sale']
-        options = self._filtered_options(journal_ids=[sale.id], account_prefixes=['1'])
+        options = self._filtered_options(journals=[sale.id], account_prefixes=['1'])
         lines = self.report._get_lines(options)
         html = str(self.report._get_pdf_export_html(options, lines))
         self.assertIn(self.company_data['company'].name, html)
@@ -103,7 +104,7 @@ class TestExports(AzkTBCommon):
         sale = self.company_data['default_journal_sale']
         report_model = type(self.env['ir.actions.report'])
         with patch.object(report_model, '_run_pdf_engine_without_processing', fake_pdf_engine):
-            result = self.report.export_to_pdf(self._filtered_options(journal_ids=[sale.id]))
+            result = self.report.export_to_pdf(self._filtered_options(journals=[sale.id]))
 
         self.assertEqual(result['file_type'], 'pdf')
         self.assertTrue(result['file_content'].startswith(b'%PDF'))

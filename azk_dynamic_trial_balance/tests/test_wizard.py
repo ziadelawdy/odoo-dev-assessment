@@ -46,8 +46,8 @@ class TestWizard(AzkTBCommon):
         self.assertEqual(options['date']['date_to'], '2017-12-31')
         self.assertTrue(options['all_entries'])
         self.assertTrue(options['hierarchy'])
+        self.assertEqual([j['id'] for j in options['journals'] if j.get('selected')], sale.ids)
         self.assertEqual(options['azk_tb'], {
-            'journal_ids': sale.ids,
             'account_prefixes': ['1', '40'],
             'analytic_account_ids': self.analytic_1.ids,
             'skip_zero_balance': True,

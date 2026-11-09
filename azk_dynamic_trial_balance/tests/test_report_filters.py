@@ -41,8 +41,9 @@ class TestFilters(AzkTBCommon):
     # ------------------------------------------------------------------
     # helpers
     # ------------------------------------------------------------------
-    def _ours(self, **azk_tb):
-        options = self._options(self.report, '2017-01-01', '2017-12-31', azk_tb=azk_tb)
+    def _ours(self, journals=(), **azk_tb):
+        extra = {'journals': [{'id': j, 'selected': True} for j in journals]} if journals else {}
+        options = self._options(self.report, '2017-01-01', '2017-12-31', azk_tb=azk_tb, **extra)
         return options, self._tb_values(self.report, options)
 
     def _native(self, forced_domain=None):
@@ -71,7 +72,7 @@ class TestFilters(AzkTBCommon):
     # ------------------------------------------------------------------
     def test_journal_filter_parity(self):
         sale = self.company_data['default_journal_sale']
-        _options, ours = self._ours(journal_ids=[sale.id])
+        _options, ours = self._ours(journals=[sale.id])
         native = self._native([('journal_id', 'in', [sale.id])])
         self.assertTrue(self._account_keys(ours))
         self._assert_account_parity(ours, native)
