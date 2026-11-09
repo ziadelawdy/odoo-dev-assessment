@@ -294,7 +294,7 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 
 ### Automated tests
 
-38 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
+45 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
 The POS tours drive Chrome through real sales.
 
 | Module / file | Covers |
@@ -304,6 +304,7 @@ The POS tours drive Chrome through real sales.
 | `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. Settings write-through. No name clash with native fields. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout, native when off, customer hidden, logo fallback, basic receipt table, no duplicated company info or unit price. |
+| `azk_pos_salesperson/tests/test_review_fixes.py` | Regressions from the independent review. Editing a combo keeps its children credited. POS refunds keep the salesperson. The order button is available on small screens (phone/tablet viewport tour). Multi-company checks. Employee records are never loaded into the POS. |
 | `azk_pos_enhanced_receipt/tests/test_both_modules.py` | Salesperson printed once, inside the enhanced table. **Tours:** test case 1 on the four configurations by name, and test case 5, each checking the **client-rendered** receipt. |
 
 ```bash
