@@ -22,6 +22,9 @@ class PosOrderReceipt(models.AbstractModel):
             return data
         if config.receipt_logo:
             data['image']['logo'] = image_data_uri(config.receipt_logo)
+        elif config.azk_logo_is_placeholder:
+            # never print Odoo's "Your logo" placeholder on the customized receipt
+            data['image']['logo'] = False
         data['extra_data'].update({
             # stored sanitized (fields.Html), so safe to render as markup
             'azk_company_name': self._azk_html(config.company_name),
