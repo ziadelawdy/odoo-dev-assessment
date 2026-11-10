@@ -8,6 +8,7 @@
                 <field name="name"/>
                 <field name="phone_number"/>
                 <field name="employee_id"/>
+                <field name="commission_rate" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>
         </field>
@@ -29,6 +30,7 @@
                         <group>
                             <field name="phone_number" widget="phone"/>
                             <field name="employee_id"/>
+                            <field name="commission_rate"/>
                         </group>
                         <group>
                             <field name="company_id" groups="base.group_multi_company"/>

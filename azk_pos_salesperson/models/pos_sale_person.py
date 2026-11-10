@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class PosSalePerson(models.Model):
@@ -17,6 +18,16 @@ class PosSalePerson(models.Model):
     employee_id = fields.Many2one('hr.employee', string='Related Employee', ondelete='set null', check_company=True)
     active = fields.Boolean(default=True)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
+    commission_rate = fields.Float(
+        string='Commission (%)', digits=(5, 2),
+        help='Percentage of the sales without tax. It is copied onto each order line when the sale is made, '
+             'so changing it later does not change past commissions.')
+
+    @api.constrains('commission_rate')
+    def _check_commission_rate(self):
+        for person in self:
+            if not 0 <= person.commission_rate <= 100:
+                raise ValidationError(_('The commission of %s must be between 0 and 100%%.', person.name))
 
     @api.model
     def _load_pos_data_domain(self, data):
