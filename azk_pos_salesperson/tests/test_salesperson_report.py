@@ -1,5 +1,5 @@
 from odoo.exceptions import ValidationError
-from odoo.tests import tagged
+from odoo.tests import new_test_user, tagged
 
 from .common import AzkPosSalespersonCommon
 
@@ -79,3 +79,62 @@ class TestSalespersonReport(AzkPosSalespersonCommon):
         self.assertAlmostEqual(groups[self.sp_a][0], 1.0)
         self.assertAlmostEqual(groups[self.sp_b][0], 1.0)
         self.assertEqual(groups[self.env['pos.sale.person']][0], 0)
+
+    # ------------------------------------------------------------------
+    # Task 3: performance per (order, salesperson)
+    # ------------------------------------------------------------------
+
+    PERF = 'azk.pos.salesperson.report'
+
+    def test_performance_one_row_per_order_and_salesperson(self):
+        self.open_new_session()
+        order = self._sync_order([
+            (self.product_x, 1, self.sp_a), (self.product_y, 1, self.sp_a),
+            (self.product_x, 1, self.sp_b), (self.product_y, 1, False),
+        ])
+        self.env.flush_all()
+        rows = self.env[self.PERF].search([('order_id', '=', order.id)])
+        self.assertEqual(len(rows), 3)
+        by_person = {row.salesperson_id: row for row in rows}
+        self.assertEqual(by_person[self.sp_a].line_count, 2)
+        self.assertAlmostEqual(by_person[self.sp_a].amount_untaxed, 30)
+        self.assertAlmostEqual(by_person[self.sp_b].amount_untaxed, 10)
+        self.assertAlmostEqual(by_person[self.env['pos.sale.person']].amount_untaxed, 20)
+
+    def test_performance_average_order_value(self):
+        self.sp_a.commission_rate = 10
+        self.open_new_session()
+        orders = (
+            self._sync_order([(self.product_x, 1, self.sp_a), (self.product_y, 1, self.sp_a)])  # A: 30
+            | self._sync_order([(self.product_x, 1, self.sp_a), (self.product_y, 1, self.sp_b)])  # A: 10
+        )
+        groups = self._report_groups(self.PERF, orders, [
+            'order_count:sum', 'amount_untaxed:sum', 'average_order_value:avg', 'product_qty:sum', 'commission:sum',
+        ])
+        orders_a, sales_a, average_a, qty_a, commission_a = groups[self.sp_a]
+        self.assertEqual(orders_a, 2)
+        self.assertAlmostEqual(sales_a, 40)
+        self.assertAlmostEqual(average_a, 20)
+        self.assertEqual(qty_a, 3)
+        self.assertAlmostEqual(commission_a, 4)
+        self.assertEqual(groups[self.sp_b][0], 1)
+
+    def test_performance_refund_negative(self):
+        self.open_new_session()
+        order = self._sync_order([(self.product_x, 2, self.sp_a), (self.product_x, -1, self.sp_a)])
+        groups = self._report_groups(self.PERF, order, ['amount_untaxed:sum', 'product_qty:sum'])
+        self.assertAlmostEqual(groups[self.sp_a][0], 10)
+        self.assertEqual(groups[self.sp_a][1], 1)
+
+    def test_performance_company_rule(self):
+        self.open_new_session()
+        order = self._sync_order([(self.product_x, 1, self.sp_a)])
+        self.env.flush_all()
+        other_company = self.env['res.company'].create({'name': 'Other Shop Company'})
+        outsider = new_test_user(
+            self.env, login='azk_report_outsider', groups='point_of_sale.group_pos_user',
+            company_id=other_company.id, company_ids=[(6, 0, other_company.ids)])
+        insider = new_test_user(self.env, login='azk_report_insider', groups='point_of_sale.group_pos_user')
+        domain = [('order_id', '=', order.id)]
+        self.assertTrue(self.env[self.PERF].with_user(insider).search(domain))
+        self.assertFalse(self.env[self.PERF].with_user(outsider).search(domain))
