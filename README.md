@@ -1,176 +1,189 @@
 # Odoo Developer Technical Assessment
 
-Submission by **Ziad Elawdy** for the Odoo Developer technical assessment.
-Two of the three exercises were selected:
+**Candidate:** Ziad Elawdy · **Target:** Odoo 20.0 Enterprise (`20.0+e-20261105`)
 
-| Exercise | Module(s) | Status |
-|---|---|---|
-| 2 — Dynamic Trial Balance | [`azk_dynamic_trial_balance`](azk_dynamic_trial_balance) | **Done** — see below |
-| 3 — POS Enhancements | [`azk_pos_salesperson`](azk_pos_salesperson), [`azk_pos_enhanced_receipt`](azk_pos_enhanced_receipt) | **Done** — see below |
-| 1 — Odoo Partner Monitor | — | Not selected |
+Three Odoo modules for Exercises 2 and 3 of the assessment. They were designed from written
+specifications, built test-first, and checked against the installed Odoo 20 source.
 
-**Target version: Odoo 20.0 Enterprise** (`20.0+e-20261105`). The assessment text mentions Odoo 18
-for Exercise 3. The modules target the Odoo 20 instance used for development and testing,
-and every framework API was checked against the installed Odoo 20 source.
+| Exercise | Module | Status | Automated tests |
+|---|---|---|---:|
+| 2 — Dynamic Trial Balance | [`azk_dynamic_trial_balance`](azk_dynamic_trial_balance) | ✅ Complete | 51 |
+| 3 — POS Salesperson Assignment | [`azk_pos_salesperson`](azk_pos_salesperson) | ✅ Complete | 77 (Exercise 3, both modules together) |
+| 3 — POS Enhanced Receipt Layout | [`azk_pos_enhanced_receipt`](azk_pos_enhanced_receipt) | ✅ Complete | |
+| 1 — Odoo Partner Monitor | — | Not selected (two of three required) | — |
 
-Design notes, plans and the GenAI documentation are in [`docs/`](docs):
+All tests pass on Odoo 20.0 Enterprise.
 
-- [`docs/genai/prompts.md`](docs/genai/prompts.md): the prompts used, in order, in English.
-- [`docs/genai/prompt-log.md`](docs/genai/prompt-log.md): what the AI produced for each prompt.
-- [`docs/superpowers/specs`](docs/superpowers/specs) and [`docs/superpowers/plans`](docs/superpowers/plans):
-  the design and the implementation plan of each feature.
+## Contents
+
+1. [Quick start](#1-quick-start)
+2. [Repository layout](#2-repository-layout)
+3. [Exercise 2 — Dynamic Trial Balance](#3-exercise-2--dynamic-trial-balance)
+4. [Exercise 3 — POS Enhancements](#4-exercise-3--pos-enhancements)
+5. [Assumptions and deviations](#5-assumptions-and-deviations)
+6. [Engineering process and GenAI usage](#6-engineering-process-and-genai-usage)
 
 ---
 
-## Exercise 2 — Dynamic Trial Balance (`azk_dynamic_trial_balance`)
+## 1. Quick start
 
-### What it does
+**Requirements**
+- Odoo 20.0 **Enterprise**. The Trial Balance depends on `account_reports`.
+- For the POS browser tours: Chrome and the Python package `websocket-client`. Without
+  them, Odoo skips the tours.
+
+**Install** (add this repository to `addons_path` first):
+
+```bash
+python odoo-bin -c <your.conf> -d <db> -i azk_dynamic_trial_balance,azk_pos_salesperson,azk_pos_enhanced_receipt --with-demo
+```
+
+**Run the automated tests:**
+
+```bash
+python odoo-bin -c <your.conf> -d <test_db> -i azk_dynamic_trial_balance --test-tags /azk_dynamic_trial_balance --stop-after-init
+```
+
+```bash
+python odoo-bin -c <your.conf> -d <test_db> -i azk_pos_salesperson,azk_pos_enhanced_receipt --test-tags /azk_pos_salesperson,/azk_pos_enhanced_receipt --stop-after-init
+```
+
+Each module installs on its own. The two POS modules also work together with no bridge
+module (see [Conflicts](#45-conflicts-when-both-pos-modules-are-installed)).
+
+## 2. Repository layout
+
+```text
+azk_dynamic_trial_balance/   Exercise 2: wizard, report handler, PDF/XLSX, demo loader, tests
+  scripts/reconcile_tb.py    Account-by-account reconciliation with the native Trial Balance
+azk_pos_salesperson/         Exercise 3: salesperson model, POS UI, receipt line, reports
+azk_pos_enhanced_receipt/    Exercise 3: configurable receipt layout, checkout options
+docs/
+  genai/prompts.md           Prompts that directed the work, skills used, token usage
+  genai/prompt-log.md        What the AI produced for each prompt
+  superpowers/specs/         Design document for each feature
+  superpowers/plans/         Test-first implementation plan for each feature
+```
+
+---
+
+## 3. Exercise 2 — Dynamic Trial Balance
+
+### 3.1 Features
 
 A wizard (*Accounting › Reporting › Statement Reports › Dynamic Trial Balance*) produces a
-trial balance with **Initial Balance**, **Movement** and **End Balance** sections. Each section
-has **Debit, Credit and Balance** columns. There are three outputs:
+trial balance with **Initial Balance**, **Movement** and **End Balance** sections. Each
+section has **Debit, Credit and Balance** columns. There are three outputs:
 
 - **Preview**: the standard Odoo dynamic report UI, with search, unfold, audit of a cell,
-  and the date / draft / hierarchy / company filters.
+  and an editable filter bar.
 - **PDF**: company, period and every applied filter appear in the header.
 - **XLSX**: a header with company, period and filters. Numeric cells, hierarchy
   indentation and a bold total.
 
 | Wizard field | Behaviour |
 |---|---|
-| Start / End Date | Period of the report. Default: current fiscal year start to today. |
+| Start / End Date | Period of the report. Default: start of the current fiscal year to today. |
 | Posted Entries | Always included (read-only). |
 | Include Unposted Entries | Adds draft entries. Cancelled entries are never included. |
-| Hierarchy and Subtotals | Parent-account tree with subtotals. Odoo 20 builds the account hierarchy on `account.account.parent_id`; `account.group` no longer exists. |
-| Hierarchy Only Parents + Account Level Up To (1–5) | Keeps the tree down to the chosen depth. Deeper accounts are rolled into their nearest shown parent, so totals are unchanged. |
-| Accounts | One or more account-code prefixes, comma-separated (e.g. `1, 40`). Letters, digits, `.` and `-` (the characters Odoo allows in codes). Anything else is rejected. Empty = all accounts. |
-| Journals | Several journals. Empty = all. They are passed to the native Journals filter of the report. |
-| Analytic Accounts | Several analytic accounts **of one plan**. Empty = all. Visible when *Analytic Accounting* is enabled (Accounting › Settings). |
-| Skip Zero Balance | Hides accounts with zero initial balance, zero movements and zero end balance. An account whose movements cancel out (100 Dr / 100 Cr) is kept. |
-| Show Amount Currency | Splits each account into one line per transaction currency, with an *Amount Currency* column (end balance in that currency, with its symbol). |
+| Hierarchy and Subtotals | Parent-account tree with subtotals, built on `account.account.parent_id`. `account.group` no longer exists in Odoo 20. |
+| Hierarchy Only Parents + Account Level Up To (1–5) | Keeps the tree down to the chosen depth. Deeper accounts roll into their nearest shown parent, so totals are unchanged. |
+| Accounts | One or more account-code prefixes, comma-separated (e.g. `1, 40`). Allowed characters: letters, digits, `.` and `-`, the characters Odoo allows in codes. Anything else is rejected. Empty = all accounts. |
+| Journals | Several journals. Empty = all. Passed to the report's native Journals filter. |
+| Analytic Accounts | Several analytic accounts **of one plan**. Empty = all. Visible when *Analytic Accounting* is enabled. |
+| Skip Zero Balance | Hides accounts with zero initial balance, zero movement and zero end balance. An account whose movements cancel out (100 Dr / 100 Cr) is kept. |
+| Show Amount Currency | Splits each account into one line per transaction currency, with an *Amount Currency* column: the end balance in that currency, with its symbol. |
 
-### Design
+**Filter bar.** The Preview has its own filter bar (a custom `AccountReportFilters`
+component, the same mechanism native reports use). It holds:
+- the *Accounts* prefix field;
+- switches for *Unposted Entries*, *Hierarchy and Subtotals*, *Only Parents* (with a level
+  selector), *Skip Zero Balance* and *Amount Currency*;
+- the native *Journals* and date filters;
+- **PDF** and **XLSX** buttons.
 
-The module defines its **own `account.report`**. Its custom handler **inherits the native
-Trial Balance handler** (`account.trial.balance.report.handler`). The goal was numbers that
-match Odoo's Trial Balance by construction, not by re-implementation:
+Every change reloads the report at once and survives a page refresh. The report can also be
+opened directly from the client action `action_azk_dynamic_trial_balance_report`.
 
-- **Initial balance** = everything before the start date.
-- For income/expense accounts (`include_initial_balance = False`), the initial balance only
-  counts from the start of the current fiscal year.
-- Earlier-year P&L results go to Odoo's **Undistributed Profits/Losses** line.
+### 3.2 Configuration
+
+None is required. Access follows the accounting groups that can read the native reports
+(`account.group_account_readonly`, `account.group_account_basic`).
+
+### 3.3 Architecture
+
+The module defines its **own `account.report`**. Its handler **inherits the native Trial
+Balance handler** (`account.trial.balance.report.handler`). The numbers therefore match
+Odoo's Trial Balance by construction, not by re-implementation.
+
+- **Initial balance** is everything before the start date. For income and expense accounts
+  (`include_initial_balance = False`), it counts only from the start of the current fiscal
+  year. Earlier-year results go to Odoo's **Undistributed Profits/Losses** line.
 - **End balance** = Initial + Movement.
-- **Company scoping** and the accountant access check come from the native report query.
-  There is no `sudo()` and no raw SQL outside the engine's own query builder.
+- **Security.** Company scoping and the accountant access check come from the native report
+  query. There is no `sudo()` and no raw SQL outside the engine's own query builder.
 
-On top of the engine:
+Design decisions on top of the engine:
 
-1. **Classic trial balance presentation.** Native Odoo shows Initial and End as a single net
-   *Balance* column. Here, a net debit balance goes to *Debit*, a net credit balance to *Credit*,
-   and *Balance = Debit − Credit*. Parent accounts are split on their net balance. The **grand
-   total sums the accounts' Debit and Credit columns**, so total debit balances = total credit
-   balances is visible. Netting the total would always show 0 / 0.
-2. **Wizard-only filters** travel in the report options under `azk_tb` and survive every
-   re-render of the Preview. Journals and account prefixes become a `forced_domain`.
+1. **Classic presentation.** Native Odoo shows Initial and End as one net *Balance* column.
+   Here a net debit goes to *Debit*, a net credit goes to *Credit*, and *Balance = Debit −
+   Credit*. Parent accounts are split on their net balance. The **grand total sums the
+   accounts' Debit and Credit columns**, so equal total debits and credits are visible.
+   Netting the total would always read 0 / 0.
+2. **Wizard filters in report options.** They travel under `azk_tb` and survive every
+   re-render. Journals and prefixes become a `forced_domain`.
    - Prefixes are validated so they cannot inject `=like` wildcards.
-   - With a prefix filter, *Undistributed Profits/Losses* is shown only when a prefix
+   - With a prefix filter, *Undistributed Profits/Losses* appears only when a prefix
      matches the company's unaffected-earnings account. It is then computed without the
-     prefix restriction, because it aggregates P&L accounts.
-3. **Analytic filter = proportional share.** An entry split 60/40 between two analytic accounts
-   shows 60 % under the first. This reuses the engine's analytic shadow table, the same logic
-   as Odoo's analytic group-by.
-   - Accounts without analytic distribution (bank, receivable, payable, taxes…) are not
-     part of an analytic view, so **a filtered report is intentionally not balanced**. A
-     visible notice says so on screen, in the PDF and in the XLSX.
-   - Analytic lines only exist for posted entries.
-4. **One line per account and company.** With several companies selected, Odoo's default *consolidation* regroups the trial balance by account code (accounts become hidden sub-lines). This report turns consolidation off, because every feature here (prefixes, hierarchy, currencies, skip-zero) works on real account lines. The numbers equal the native report with consolidation off.
-5. **Filters editable in the report.** The report has its own filter bar (a custom
-   `AccountReportFilters` component, the same mechanism native reports use). It contains:
-   - an *Accounts* prefix field;
-   - switches for *Unposted Entries*, *Hierarchy and Subtotals*, *Only Parents* (with a level
-     selector from 1 to 5), *Skip Zero Balance* and *Amount Currency*;
-   - Odoo's native *Journals* dropdown and date filter;
-   - **PDF** and **XLSX** buttons.
+     prefix, because it aggregates P&L accounts.
+3. **Analytic filter = proportional share.** An entry split 60/40 between two analytic
+   accounts shows 60 % under the first. This reuses the engine's analytic shadow table,
+   the same logic as Odoo's analytic group-by.
+   - Accounts without analytic distribution (bank, receivables, payables, taxes) are not
+     part of an analytic view, so **a filtered report is intentionally unbalanced**. A
+     notice says so on screen, in the PDF and in the XLSX.
+   - Analytic lines exist only for posted entries.
+4. **One line per account and company.** With several companies selected, Odoo's default
+   *consolidation* regroups the report by account code, hiding the real accounts. It is
+   turned off here, because prefixes, hierarchy, currencies and skip-zero all work on real
+   account lines. The figures equal the native report with consolidation off.
 
-   Every change reloads the report immediately and survives a refresh. Only the analytic
-   accounts are chosen in the wizard; they appear in the summary banner. The report can also
-   be opened directly from the client action `action_azk_dynamic_trial_balance_report`.
+### 3.4 Demo data
 
-### Installation
-
-1. Put this repository on the Odoo `addons_path`.
-2. Update the Apps list.
-3. Install **Dynamic Trial Balance**. It depends on `account_reports` (Odoo Enterprise).
-
-```bash
-python odoo-bin -c <your.conf> -d <db> -i azk_dynamic_trial_balance --with-demo
-```
-
-No configuration is needed. Access is limited to the accounting groups that can read the
-native reports (`account.group_account_readonly`, `account.group_account_basic`).
-
-### Demo data
-
-Installing with demo data (`--with-demo`) runs a loader. It is written in Python so that
-account codes, journals and fiscal-year dates fit any database, and it is idempotent. It creates:
+Installing with `--with-demo` runs an idempotent loader. It is written in Python so that
+account codes, journals and fiscal-year dates fit any database. It creates:
 
 - a 3-level account tree (`1000 › 1100 › 1110/1120`, `6000 › 6100/6200`, …);
 - two foreign currencies with rates;
-- an analytic plan with two departments and a 60/40 salary entry;
-- posted entries over the previous and the current fiscal year;
+- an analytic plan with two departments and a salary entry split 60/40;
+- posted entries across the previous and the current fiscal year;
 - one draft and one cancelled entry.
 
-### Testing strategy
+### 3.5 Testing strategy
 
-**Automated tests**: 51 tests in `azk_dynamic_trial_balance/tests`, all passing on Odoo 20.
-They were written test-first (each one was seen failing before the code existed).
+**Principle.** Odoo's own Trial Balance is the reference dataset. Every account's initial,
+debit, credit and end values must match it. Comparing totals alone is not enough, because
+offsetting errors would hide. Every test was seen failing before the code existed.
+
+**Automated tests (51):**
 
 | File | Covers |
 |---|---|
-| `test_report_engine.py` | Default options with several companies and *totals below sections* (regression found in the Preview). Parity with native Odoo per account. Classic split. Reversed-sign account. Opening-only account. P&L across fiscal years (Undistributed P/L). Last day of period / day before. Parents net-split and grand total. Multi-company isolation. Draft included/excluded, cancelled never. |
-| `test_report_filters.py` | Journal and multi-prefix filters (parity with native under the same domain). Prefix + Undistributed P/L rule. Analytic 60/40 share. Unbalanced notice. Prefix injection attempt (`1%' OR 1=1`). |
-| `test_report_display.py` | Skip-zero (keeps cancelling movements, drops empty parents). Hierarchy levels 1–3 keep totals. Amount-currency lines add up to the account and show their currency symbol. Parents never sum mixed currencies. Column hidden when off. |
+| `test_report_engine.py` | Per-account parity with native Odoo. Classic split. Reversed-sign account. Opening-only account. P&L across fiscal years (Undistributed P/L). Last day of the period / the day before. Parent net-split and grand total. Multi-company isolation. Drafts included or excluded; cancelled entries never included. Default options with several companies and *totals below sections*. |
+| `test_report_filters.py` | Journal and multi-prefix filters, with parity against native under the same domain. Prefix + Undistributed P/L rule. Analytic 60/40 share. Unbalanced notice. Prefix injection attempt (`1%' OR 1=1`). |
+| `test_report_display.py` | Skip-zero keeps cancelling movements and drops empty parents. Hierarchy levels 1–3 keep totals. Amount-currency lines add up to the account and show their symbol. Parents never sum mixed currencies. Column hidden when off. |
 | `test_wizard.py` | Field-to-options mapping. Options survive re-render. Preview action. Date validation. Single-plan analytic validation. Access rights. |
-| `test_exports.py` | XLSX header (company, period, filters), numeric values equal to the report, bold total, analytic notice. PDF header filters. PDF export path (the wkhtmltopdf call is stubbed: inside a test transaction it would fetch its CSS from the same blocked server). Wizard export actions. A real PDF and XLSX were also generated from the demo database with the server running. |
-| `test_review_fixes.py` | Regressions from the independent code review: unfolded accounts (partner / journal-item sub-lines) never inflate the total, with and without Amount Currency. Expanding one account never adds Undistributed P/L lines. Prefixes with `-`. The wizard rejects invalid prefixes. Comparison periods are not offered. |
-| `test_report_filter_bar.py` | Filter bar component registered. PDF/XLSX buttons in the bar. Native journal filter, also fed by the wizard. **Tour:** every switch, the prefix field and the level selector update the report. |
-| `test_demo_data.py` | Demo loader content and idempotency. Per-account parity with native over the demo data, with and without hierarchy. Total debit = total credit. |
+| `test_exports.py` | XLSX header, values equal to the report, bold total, analytic notice. PDF header and export path. The wkhtmltopdf call is stubbed because, inside a test transaction, it would fetch its CSS from the blocked server. Real PDF and XLSX files were also generated from the demo database. |
+| `test_review_fixes.py` | Regressions from the independent review. Unfolded sub-lines never inflate the total. Expanding one account adds no Undistributed P/L lines. Prefixes with `-`. Invalid prefixes rejected. No comparison periods. |
+| `test_report_filter_bar.py` | Filter bar registered, PDF/XLSX buttons, native journal filter. **Tour:** every switch, the prefix field and the level selector update the report. |
+| `test_demo_data.py` | Demo loader content and idempotency. Parity with native over the demo data, with and without hierarchy. Total debit = total credit. |
 
-Run them:
-
-```bash
-python odoo-bin -c <your.conf> -d <test_db> -i azk_dynamic_trial_balance --test-tags /azk_dynamic_trial_balance --stop-after-init
-```
-
-The **parity tests** are the core of the strategy. Odoo's own Trial Balance is the reference
-dataset, and every account's initial, debit, credit and end values must be equal. Totals alone
-are not enough, because offsetting errors would hide.
-
-**Manual test steps** (on a database installed with `--with-demo`):
-
-1. Open *Accounting › Reporting › Statement Reports › Dynamic Trial Balance*. Keep the default
-   dates and press **Preview**.
-   - Expected: the demo tree is shown with Initial / Movement / End × Debit / Credit / Balance.
-   - Expected: the total line has equal Debit and Credit in Initial and End.
-2. Open the native *Trial Balance* for the same period. Compare `1110 Main Bank (Demo)` and
-   `6100 Salaries (Demo)`. Expected: the same initial, movement and end balances.
-3. Wizard › *Accounts* `11` › Preview. Expected: only `11xx` accounts, and the filter banner
-   is shown.
-4. Wizard › *Analytic Accounts* `Sales Dept (Demo)` › Preview. Expected: Salaries movement
-   **4,800** (60 % of 8,000), and the "not balanced" notice.
-5. Wizard › *Hierarchy Only Parents*, level **1** › Preview. Expected: only the top accounts,
-   with the same total as step 1.
-6. Wizard › *Show Amount Currency* › Preview. Expected: `1200 Customers (Demo)` split into a
-   company-currency line and a foreign-currency line, the latter showing its amount in that
-   currency.
-7. Wizard › **PDF** and **XLSX**. Expected: the same lines and numbers as the Preview, with
-   company, period and filters in the header.
-
-### Reconciliation with the native Trial Balance (demo data)
-
-Generated by [`scripts/reconcile_tb.py`](azk_dynamic_trial_balance/scripts/reconcile_tb.py), not typed by hand:
+**Reconciliation with the native Trial Balance (demo data).** This table was generated by
+[`scripts/reconcile_tb.py`](azk_dynamic_trial_balance/scripts/reconcile_tb.py), not typed by
+hand.
 
 Company: YourCompany — period 2026-01-01 .. 2026-12-31
+
 | Account | Native Initial | Ours Initial | Native Debit | Ours Debit | Native Credit | Ours Credit | Native End | Ours End | Difference |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Main Bank (Demo) | 47,000.00 | 47,000.00 | 0.00 | 0.00 | 8,500.00 | 8,500.00 | 38,500.00 | 38,500.00 | 0.00 |
@@ -188,217 +201,243 @@ Company: YourCompany — period 2026-01-01 .. 2026-12-31
 | Salaries (Demo) | 0.00 | 0.00 | 8,000.00 | 8,000.00 | 0.00 | 0.00 | 8,000.00 | 8,000.00 | 0.00 |
 | Expenses | 0.00 | 0.00 | 652.27 | 652.27 | 30.00 | 30.00 | 622.27 | 622.27 | 0.00 |
 | Result Brought Forward | -9,000.00 | -9,000.00 | 0.00 | 0.00 | 0.00 | 0.00 | -9,000.00 | -9,000.00 | 0.00 |
-| Total | 0.00 | 0.00 | 266,638.24 | 266,638.24 | 266,638.24 | 266,638.24 | 0.00 | 0.00 | 0.00 |
-Lines only in ours: none — largest difference: 0.00
+| **Total** | 0.00 | 0.00 | 266,638.24 | 266,638.24 | 266,638.24 | 266,638.24 | 0.00 | 0.00 | **0.00** |
 
-Re-run it with:
+Lines only in ours: none. Largest difference: 0.00. Re-run it with:
 
 ```bash
 python odoo-bin shell -c <your.conf> -d <db> --no-http < azk_dynamic_trial_balance/scripts/reconcile_tb.py
 ```
 
-### Known limitations
+**Manual test script** (database installed with `--with-demo`):
+
+| # | Steps | Expected result |
+|---|---|---|
+| 1 | Open *Dynamic Trial Balance*, keep the default dates, press **Preview**. | The demo tree with Initial / Movement / End × Debit / Credit / Balance. The total line has equal Debit and Credit in Initial and End. |
+| 2 | Open the native *Trial Balance* for the same period. Compare `1110 Main Bank (Demo)` and `6100 Salaries (Demo)`. | Identical initial, movement and end balances. |
+| 3 | Wizard › *Accounts* `11` › Preview. | Only `11xx` accounts, with the filter banner. |
+| 4 | Wizard › *Analytic Accounts* `Sales Dept (Demo)` › Preview. | Salaries movement **4,800** (60 % of 8,000), and the "not balanced" notice. |
+| 5 | Wizard › *Hierarchy Only Parents*, level **1** › Preview. | Only the top accounts, with the same total as step 1. |
+| 6 | Wizard › *Show Amount Currency* › Preview. | `1200 Customers (Demo)` split into a company-currency line and a foreign-currency line showing its amount in that currency. |
+| 7 | Wizard › **PDF** and **XLSX**. | The same lines and numbers as the Preview, with company, period and filters in the header. |
+
+### 3.6 Known limitations
 
 - Single period by design: the native *Comparison* filter is not offered.
-- With *Unfold All*, the native report omits its *Cumulative Translation Adjustment* line (multi-currency companies). This report inherits that behaviour.
-
-- With an analytic filter, the *Amount Currency* column shows the journal item's full foreign
-  amount (the analytic shadow table carries `amount_currency` unprorated).
-- The trial-balance engine method is re-declared in the handler to add an `amount_currency`
-  aggregate (the native SELECT is built inline). Its logic is otherwise identical, and the
-  parity tests guard it.
-- With *Show Amount Currency*, Debit/Credit splits are per currency line, so total Debit/Credit
-  can differ from the option-off report. Net balances are identical.
+- With *Unfold All*, the native report omits its *Cumulative Translation Adjustment* line
+  in multi-currency companies. This report inherits that behaviour.
+- With an analytic filter, *Amount Currency* shows the journal item's full foreign amount,
+  because the analytic shadow table carries `amount_currency` unprorated.
+- The engine's trial-balance query method is re-declared in the handler to add an
+  `amount_currency` aggregate, because the native SELECT is built inline. Its logic is
+  otherwise identical, and the parity tests guard it.
+- With *Show Amount Currency*, Debit/Credit splits are per currency line, so total
+  Debit/Credit can differ from the report with the option off. Net balances are identical.
 
 ---
 
-## Exercise 3 — POS Enhancements (`azk_pos_salesperson`, `azk_pos_enhanced_receipt`)
+## 4. Exercise 3 — POS Enhancements
 
-The exercise is split into two independent modules, as required. Each module installs on its
-own. Installed together, they compose with no bridge module (see *Conflicts* below).
+The exercise is split into two independent modules, as required. Each feature is toggled
+per POS, and with both toggles off the POS behaves exactly as native Odoo.
 
-### Salesperson Assignment (`azk_pos_salesperson`)
+### 4.1 Salesperson Assignment (`azk_pos_salesperson`)
 
-- **Salespersons** (*Point of Sale › Configuration › Salespersons*): name (required), phone, and
-  an optional related employee. They are archivable and per company.
-- **Per POS settings**, on the POS form and on the POS Settings page:
-  - *Salesperson Assignment* (`active_salesperson_feature`);
-  - *Allowed Salespersons* (`allowed_sale_person_ids`).
-- **Offline:** the allowed salespersons are loaded with the POS data, and assignments are stored
-  on the order and synced with it. Nothing calls the server.
-- **In the POS (feature on):**
-  - adding the **first product** of an order opens the salesperson popup. The person chosen
-    becomes the order salesperson (for every line so far), so every product added after it gets
-    the same person.
-    - *No salesperson* adds the product unassigned, and the popup is not shown again for that
-      order.
-    - Closing the popup is not an answer: the next product asks again.
-    - Refund orders keep the original seller and never ask. Lines added by code also never
-      ask: global discount, tips, sale-order import.
-    - The "answered" state lives in the browser only, so an order reloaded from the server may
-      ask once more;
-  - a salesperson button under every order line (the name, or *Add salesperson*) changes
-    **that line only**;
-  - **Assign Salesperson to Order** assigns a salesperson to **every line**, and also becomes the
-    order salesperson. **Lines added afterwards inherit it.** A line changed individually keeps
-    its value.
-  - Pressing *Assign to Order* again overwrites all lines (assessment test case 3).
-  - The popup is the native selection popup. It lists the allowed salespersons plus
-    **No salesperson**, which clears the value.
-  - A product added again only merges into a line credited to the same salesperson, so two
-    salespersons selling the same product keep separate lines.
-  - Combo children follow their parent.
-- **Backend:** `salesperson_id` is shown in both order-line list views (*All sales lines* and
-  *Sale line*), and on the order form (order salesperson and line column).
-- **Receipt:** `Salesperson: <name>` is printed under the product, only when the feature is on
-  and the line is assigned. This works on the client receipt and on the server receipt
+**Specified features**
+
+- **Salesperson model** (`pos.sale.person`, *Point of Sale › Configuration › Salespersons*):
+  name (required), phone, optional related employee. Records can be archived and belong to a
+  company.
+- **Per-POS settings**, on the POS form and the POS Settings page:
+  `active_salesperson_feature` and `allowed_sale_person_ids`.
+- **Offline.** The allowed salespersons are loaded with the POS data. Assignments are stored
+  on the order and synced with it, with no extra server calls.
+- **Line assignment.** A salesperson button under every order line (the name, or *Add
+  salesperson*) changes **that line only**.
+- **Order assignment.** **Assign Salesperson to Order** assigns a salesperson to **every
+  line** and also becomes the order salesperson.
+  - **Lines added afterwards inherit it.**
+  - A line changed individually keeps its value.
+  - Pressing the button again overwrites all lines (assessment test case 3).
+- **Popup.** The native selection popup, listing the allowed salespersons plus **No
+  salesperson**, which clears the value.
+- **Backend.** `salesperson_id` appears in both order-line list views and on the order
+  form.
+- **Receipt.** `Salesperson: <name>` is printed under the product, only when the feature is
+  on and the line is assigned. This applies to the client receipt and to the server receipt
   (email/download).
-- **Reports** (*Point of Sale › Reporting*, POS managers):
-  - **Sales by Salesperson.** Every product sold, credited to the salesperson of its line. It is
-    built on the native POS analysis, so the amounts match it. Pivot (salesperson → product →
-    day), graph and a detailed list. Measures: orders, quantity, sales with and without tax,
-    discount, margin, commission. Filters for completed sales, refunds, sales without a
-    salesperson, dates, POS and session. The native *Orders* analysis can also group by salesperson.
-  - **Salesperson Performance.** One row per order and salesperson: orders, sales, **average
-    order value**, items and commission, by day, week or month. Refund orders are netted from
-    sales but are not counted as orders.
-  - **Commission:** a rate (%) on each salesperson, applied to the sales without tax. The rate is
-    frozen on the line when it is sold, so changing it later does not rewrite past commissions.
-    A refund keeps the rate of the sale it refunds.
 
-### Enhanced Receipt Layout (`azk_pos_enhanced_receipt`)
+**Assignment rules**
 
-- **Per POS settings:**
-  - *Customized Receipt* (`use_customized_receipt`);
-  - *Receipt Logo* (`receipt_logo`);
-  - *Receipt Company Name* / *Details* (`company_name`, `company_details`);
-  - *Show Customer Details* (`show_customer_details`).
-- **Enhanced layout**, from top to bottom. Sections are separated by dashed rules (design "A",
-  chosen by the user from three mockups):
-  1. Receipt logo, falling back to the standard logo when none is uploaded. Odoo's default
-     *Your logo* placeholder is never printed.
+- A product added again merges only into a line credited to the same salesperson, so two
+  salespersons selling the same product keep separate lines.
+- Combo children follow their parent.
+- Refund lines keep the original seller.
+
+### 4.2 Enhanced Receipt Layout (`azk_pos_enhanced_receipt`)
+
+- **Per-POS settings:** `use_customized_receipt`, `receipt_logo`, `company_name`,
+  `company_details`, `show_customer_details`.
+- **Enhanced layout**, top to bottom, with sections separated by dashed rules:
+  1. The receipt logo, or the standard logo when none is uploaded. Odoo's *Your logo*
+     placeholder is never printed.
   2. Company name (large), details and tax ID.
-  3. Order block: ticket, date and cashier.
+  3. Order block: ticket, date, cashier.
   4. Customer name and address, when enabled.
-  5. A **table** with Product | Qty | Price | Total.
+  5. An HTML **table**: Product | Qty | Price | Total.
      - Product names are bold at normal size, so they do not wrap on an 80 mm ticket.
      - Numbers sit in narrow right-aligned columns.
      - Secondary lines (salesperson, discount, note) are small and muted.
-     - The gift/basic receipt has Product | Qty only.
+     - The gift/basic receipt shows Product | Qty only.
   6. Totals, taxes, payments and footer, as native.
+- **No duplicates.** The native ticket, cashier, customer and company blocks are replaced,
+  not repeated.
+- **Email rendering.** The layout uses tables, not flexbox, so the emailed image rendered by
+  wkhtmltoimage looks the same as the printed receipt.
+- **Option off.** The native receipt, unchanged (backward compatible).
+- **Security.** `company_name` and `company_details` are `Html` fields with Odoo's sanitizer.
+  Scripts and event handlers are stripped on save, so nothing executable reaches the
+  receipt.
 
-  The native ticket, cashier, customer and footer company blocks are replaced, not duplicated.
-  The layout uses tables (no flexbox) so the emailed image, rendered by wkhtmltoimage, looks
-  the same.
-- **Checkout options** (per POS, *Point of Sale › Configuration › Point of Sale*):
-  - *Receipt Preview on Payment Screen* (`azk_payment_receipt_preview`, on by default). On
-    large screens the payment screen gets a third column with the receipt exactly as it will
-    print, updated live as payments are added. The draft "Pro forma" label is hidden there.
-  - *Email Receipt Automatically* (`azk_auto_email_receipt`). After *Validate*, the receipt is
-    emailed to the customer when the customer has a valid email. It uses the native
-    `action_send_receipt`, does not block the cashier and shows a notification. Orders still
-    offline are skipped; the native *Send* button can still be used later. This needs an
-    outgoing mail server.
-  - **Printing without a click** uses Odoo's own *Automatic Receipt Printing*
-    (`iface_print_auto`). With a receipt printer (IoT/ePOS) it prints silently. In a plain
-    browser with no printer, the browser's print dialog opens by itself after *Validate*,
-    because browsers never print without asking.
-- **Option off:** the native receipt, unchanged.
-- **Security:** company name and details are `Html` fields with Odoo's sanitizer, instead of the
-  spec's *Text*, because the spec allows HTML. Scripts and event handlers are stripped on save,
-  so nothing executable reaches the receipt.
+### 4.3 Beyond the specification
 
-### Installation and configuration
+These were added after hands-on acceptance testing. Each can be configured or ignored
+without affecting the specified behaviour.
 
-```bash
-python odoo-bin -c <your.conf> -d <db> -i azk_pos_salesperson,azk_pos_enhanced_receipt --with-demo
-```
+- **Salesperson prompt on the first product.** Adding the first product of an order opens
+  the salesperson popup. The person chosen becomes the order salesperson, so every product
+  added afterwards gets the same person.
+  - *No salesperson* skips the prompt for that order.
+  - Closing the popup is not an answer: the next product asks again.
+  - Refunds and lines added by code (global discount, tips, sale-order import) never ask.
+- **Receipt preview on the payment screen** (`azk_payment_receipt_preview`, on by default).
+  On large screens the payment screen shows the receipt exactly as it will print, updated
+  live as payments are added.
+- **Automatic receipt email** (`azk_auto_email_receipt`). After *Validate*, the receipt is
+  emailed when the customer has a valid email address.
+  - It uses the native `action_send_receipt`, does not block the cashier, and confirms
+    with a notification.
+  - Orders that are still offline are skipped. Requires an outgoing mail server.
+- **Printing without a click** uses Odoo's native *Automatic Receipt Printing*
+  (`iface_print_auto`).
+- **Salesperson reports** (*Point of Sale › Reporting*, POS managers):
+  - **Sales by Salesperson.** Every product sold, credited to the salesperson of its line,
+    built on the native POS analysis so the amounts reconcile with it.
+    - Pivot: salesperson → product → day. Also a graph and a detailed list.
+    - Measures: orders, quantity, sales with and without tax, discount, margin, commission.
+    - Filters: completed sales (default), refunds, unassigned sales, dates, POS, session.
+  - **Salesperson Performance.** One row per order and salesperson: orders, sales,
+    **average order value**, items and commission, by day, week or month. Refunds reduce
+    sales but are not counted as orders.
+  - **Commission.** A rate (%) per salesperson, applied to sales excluding tax.
+    - The rate is frozen on each sale line at the time of sale, so a later change never
+      rewrites past commissions.
+    - A refund uses the rate of the sale it refunds.
+    - Set it in *Point of Sale › Configuration › Salespersons › Commission (%)*.
 
-Demo data creates *Salesperson A, B, C*. To set up the assessment configurations (§4.1), go to
-*Point of Sale › Configuration › Point of Sale* and create or open four POS:
+### 4.4 Configuration and testing
+
+**Demo data** creates *Salesperson A, B, C*. For the assessment's configurations (§4.1),
+open *Point of Sale › Configuration › Point of Sale* and set up:
 
 | POS | Salesperson Assignment | Allowed | Customized Receipt | Receipt fields |
 |---|---|---|---|---|
 | `POS_Sales_Enabled_Enhanced_Receipt` | ✓ | A, B | ✓ | logo, company name/details, customer details ✓ |
 | `POS_Sales_Enabled_Default_Receipt` | ✓ | A, B | ✗ | — |
 | `POS_Sales_Disabled_Enhanced_Receipt` | ✗ | — | ✓ | logo, company name/details, customer details ✓ |
-| `POS_All_Disabled` | ✗ | (may be set, ignored) | ✗ | (may be set, ignored) |
+| `POS_All_Disabled` | ✗ | (may be set; ignored) | ✗ | (may be set; ignored) |
 
-### Manual test steps (assessment §4.2)
+**Manual test script** (assessment §4.2):
 
-1. **Visibility.** Open a session on each POS and sell something.
-   - The first-product popup, the line button and the *Assign Salesperson to Order* button
-     appear only when Salesperson Assignment is on.
-   - The receipt shows the branded table layout only when Customized Receipt is on.
-2. **Per line.** Add *X* (pick *No salesperson* in the first-product popup) and *Y*. Click the
-   salesperson button under X and pick A; under Y pick B. Pay.
-   - The receipt shows A under X and B under Y.
-   - *Point of Sale › Orders › Order lines* shows the same.
-3. **Global overwrites.** Assign A and B per line, then *Assign Salesperson to Order* → C. Both
-   lines show C on screen, on the receipt and in the backend.
-4. **No assignment.** No name anywhere, and an empty column in the backend.
-5. **Change during a session.** Enable both features on an open session's POS in the backend
-   and sell without reloading. The UI and receipt are unchanged until the POS is reloaded
-   (expected POS behaviour).
+| # | Test case | Steps | Expected result |
+|---|---|---|---|
+| 1 | Visibility | Open a session on each POS and complete a sale. | Salesperson controls appear only when Salesperson Assignment is on. The table layout appears only when Customized Receipt is on. |
+| 2 | Per line | Add *X* (choose *No salesperson* in the first-product prompt) and *Y*. Assign A to X and B to Y with the line buttons. Pay. | A under X and B under Y on screen, on the receipt and in *Orders › Order lines*. |
+| 3 | Global overwrites | Assign A and B per line, then *Assign Salesperson to Order* → C. | Both lines show C on screen, on the receipt and in the backend. |
+| 4 | No assignment | Sell without assigning anyone. | No name anywhere; empty column in the backend. |
+| 5 | Change during a session | Enable both features on the POS of an open session and sell without reloading. | UI and receipt unchanged until the POS is reloaded (expected POS behaviour). |
 
-### Automated tests
+**Automated tests (77, both modules installed).** Every test was seen failing first. The
+browser tours drive Chrome through real sales.
 
-77 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
-The POS tours drive Chrome through real sales.
-
-| Module / file | Covers |
+| File | Covers |
 |---|---|
-| `azk_pos_salesperson/tests/test_salesperson_backend.py` | Required name. Loads only the allowed salespersons, and none when the feature is off. Order sync stores the line and order salesperson. Access rights (POS user read, manager write). Backend views. |
-| `azk_pos_salesperson/tests/test_salesperson_receipt.py` | Receipt data and server-rendered receipt: name under the product; hidden when the feature is off or the line is unassigned. |
-| `azk_pos_salesperson/tests/test_salesperson_report.py` | Commission rate bounds, frozen at sale time, kept on re-sync and on refunds. Report rows and totals per salesperson match the order lines; refunds netted; unassigned group. Performance: one row per order and salesperson, average order value, refunds not counted, company rule. Menus, actions and views. |
-| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. First-product popup (choose or skip). New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
-| `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. Settings write-through. No name clash with native fields. |
-| `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout, native when off, customer hidden, logo fallback, basic receipt table, no duplicated company info or unit price. |
-| `azk_pos_salesperson/tests/test_review_fixes.py` | Regressions from the independent review. Editing a combo keeps its children credited. POS refunds keep the salesperson. The order button is available on small screens (phone/tablet viewport tour). Multi-company checks. Employee records are never loaded into the POS. |
-| `azk_pos_enhanced_receipt/tests/test_both_modules.py` | Salesperson printed once, inside the enhanced table. **Tours:** test case 1 on the four configurations by name, and test case 5, each checking the **client-rendered** receipt. |
+| `azk_pos_salesperson/tests/test_salesperson_backend.py` | Required name. Only the allowed salespersons are loaded, and none when the feature is off. Order sync stores the line and order salesperson. Access rights. Backend views. |
+| `azk_pos_salesperson/tests/test_salesperson_receipt.py` | Name under the product on the receipt data and the server receipt. Hidden when the feature is off or the line is unassigned. |
+| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours:** test cases 2, 3 and 4. First-product prompt (choose or skip). Inheritance of the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when off. |
+| `azk_pos_salesperson/tests/test_salesperson_report.py` | Commission bounds, frozen at sale time, kept on re-sync and refunds. Report totals per salesperson; refunds netted; unassigned group. Performance rows, average order value, refunds not counted, company rule. Menus and views. |
+| `azk_pos_salesperson/tests/test_review_fixes.py` | Independent-review regressions. Editing a combo keeps its children credited. Refunds keep the salesperson. Order button on small screens. Multi-company. Employees never loaded into the POS. |
+| `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. No clash with native fields. |
+| `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout. Native layout when off. Customer hidden. Logo fallback. Basic receipt table. No duplicated company info. |
+| `azk_pos_enhanced_receipt/tests/test_checkout.py` | Payment-screen preview and automatic email. |
+| `azk_pos_enhanced_receipt/tests/test_both_modules.py` | Salesperson printed once, inside the enhanced table. **Tours:** test case 1 on the four configurations and test case 5, each checking the client-rendered receipt. |
 
-```bash
-python odoo-bin -c <your.conf> -d <test_db> -i azk_pos_salesperson,azk_pos_enhanced_receipt --test-tags /azk_pos_salesperson,/azk_pos_enhanced_receipt --stop-after-init
-```
+### 4.5 Conflicts when both POS modules are installed
 
-The POS tours need Chrome and the Python package `websocket-client`. Without it, Odoo *skips*
-the tours.
+*Assessment question: "If both addons are installed on the same database instance, what
+possible conflicts might occur, and how could we resolve them?"*
 
-### Conflicts when both modules are installed (assessment question)
-
-Both modules extend the **same receipt** and the **same POS settings**. These are the conflicts
-that could happen, and how this design avoids them:
+Both modules extend the **same receipt** and the **same POS settings**. These are the
+possible conflicts and how this design avoids them:
 
 1. **The same QWeb receipt templates are extended twice.**
    - The salesperson module only appends inside the native `extra-info` hook of
      `pos_orderline_receipt_information`.
-   - The enhanced receipt replaces the line loop with a table, but its Product cell **re-uses**
-     `pos_orderline_receipt_information`.
-   - So the salesperson name appears inside the table with no dependency between the modules.
-     `test_both_modules.py` verifies it.
-   - The rule that avoids this class of conflict: target stable `name`d hooks, and never
-     replace a template another addon extends.
-2. **Both patch the receipt data generator** (JS `GeneratePrinterData` and its Python mirror).
-   Each patch calls `super()` and only adds its own keys (`azk_salesperson`, `azk_enhanced`, …).
+   - The enhanced receipt replaces the line loop with a table, but its Product cell
+     **re-uses** `pos_orderline_receipt_information`.
+   - The salesperson name therefore appears inside the table with no dependency between
+     the modules. `test_both_modules.py` verifies it.
+   - **Rule:** target stable, named hooks, and never replace a template that another addon
+     extends.
+2. **Both patch the receipt data generator** (JS `GeneratePrinterData` and its Python
+   mirror). Each patch calls `super()` and adds only its own keys (`azk_salesperson`,
+   `azk_enhanced`, …).
 3. **Both add settings to the same views.** Each uses its own `<setting id>`, positioned
    relative to native anchors.
-4. **Field name clashes.** The new `pos.config` fields do not exist natively (tested). Native
-   `custom_logo`/`logo` are left untouched.
-5. **Load order.** Neither module depends on the other. If two addons ever needed to cooperate
-   more tightly, the standard resolution is a small **bridge module** (`auto_install: True`,
+4. **Field name clashes.** The new `pos.config` fields do not exist natively (tested).
+   Native `custom_logo` and `logo` are untouched.
+5. **Load order.** Neither module depends on the other. If two addons ever needed tighter
+   cooperation, the standard resolution is a small **bridge module** (`auto_install: True`,
    depending on both) that holds the glue code. This design does not need one.
 
-### Notes and decisions
+---
 
-- **Odoo 20:**
-  - The POS receipt is server QWeb rendered on the client; the spec's `XmlReceipt` no longer
-    exists, so the extensions target `pos_order_receipt*`.
-  - Security uses the Odoo 20 `ir.access` format.
-  - Binary fields are `BinaryBytes`.
-- **Design calls:**
-  - the order-level salesperson, so inheritance survives reloads and offline restarts;
-  - the "No salesperson" entry;
-  - the merge rule;
-  - `Html` instead of `Text`;
-  - settings on both the POS form and the Settings page;
-  - archived salespersons stay on past orders.
+## 5. Assumptions and deviations
+
+| Topic | Specification | Decision and reason |
+|---|---|---|
+| Odoo version | Exercise 3 targets Odoo 18. | All modules target the installed Odoo 20.0 Enterprise. Every API was verified in its source. |
+| Receipt template | `point_of_sale.XmlReceipt` | No longer exists. The Odoo 20 receipt is server QWeb rendered on the client, so the extensions target `pos_order_receipt*`. |
+| Access rights | — | Odoo 20's `ir.access` format; global domain lines replace record rules. Binary fields are `BinaryBytes`. |
+| Journals / Analytic Accounts | Described as Many2one, with "if nothing is selected". | Implemented as multi-selection (Many2many). Analytic accounts are limited to one plan, so the shares stay meaningful. |
+| Company name / details | `Text` | `Html` with sanitizing, because the specification allows HTML and it must not run scripts. |
+| Global assignment | Overwrites individual assignments (test case 3). | Implemented as specified. Lines added afterwards inherit the order salesperson. |
+| Settings placement | POS form | On both the POS form and the POS Settings page. |
+| Archived salespersons | — | Stay on past orders and in reports. They are no longer offered in the POS. |
+
+---
+
+## 6. Engineering process and GenAI usage
+
+The work used Claude Code (model Claude Opus 5.5) under a written engineering protocol:
+**analyse → plan → implement → test → debug → review → verify**, with no claim made
+without evidence.
+
+- **Design first.** Each feature has a written design ([`docs/superpowers/specs`](docs/superpowers/specs))
+  and a test-first plan ([`docs/superpowers/plans`](docs/superpowers/plans)). A second agent
+  checked each design before the plan was written.
+- **Test-first.** Every test was seen failing before the code. Some fixes were also proven
+  with deliberate mutations.
+- **Independent review.** A fresh agent reviewed each whole branch before merging. Its
+  important findings were fixed test-first.
+- **Verification in the source.** Framework claims were checked against the installed
+  Odoo 20 code.
+
+| Document | Content |
+|---|---|
+| [`docs/genai/prompts.md`](docs/genai/prompts.md) | The prompts that directed the work, the skills and agents used, and token usage. |
+| [`docs/genai/prompt-log.md`](docs/genai/prompt-log.md) | What the AI produced for each step, and what it found along the way. |
+
+**Token usage:** about **419 million tokens** processed over 1,142 model requests: 0.85 M
+output, 4.97 M fresh input and 413 M cached context. The breakdown is in
+[`prompts.md`](docs/genai/prompts.md#6-token-usage).

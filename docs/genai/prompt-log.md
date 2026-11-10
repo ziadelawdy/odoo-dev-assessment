@@ -1,9 +1,9 @@
 # GenAI usage log
 
 **Tool:** Claude Code (Anthropic), model Claude Opus 5.5, running against the local
-Odoo 20.0 Enterprise source. The conversation was in Egyptian Arabic; prompts below are
-faithful English summaries, in order. Outputs are summarised, with links to the artefacts
-they produced. The full prompts, rewritten in English, are in [`prompts.md`](prompts.md).
+Odoo 20.0 Enterprise source. Each row pairs a prompt (summarised) with what the AI
+produced, with links to the resulting artefacts. The full prompts, the skills used and the
+token usage are in [`prompts.md`](prompts.md).
 
 The workflow was set up so the AI could not "vibe" its way past correctness. It worked as
 brainstorm → written design → reviewed plan → test-first implementation → independent

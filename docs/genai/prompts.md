@@ -1,252 +1,400 @@
-# Prompts used
+# Prompt Engineering Log
 
-This file lists the prompts I gave the AI assistant (Claude Code, model Claude Opus 5.5),
-in the order I gave them. I wrote them in Egyptian Arabic. The versions below are English
-translations, edited into a clean, professional form. Each one keeps the intent, the
-constraints and the decisions of the original.
+These are the prompts that directed the work, in the order they were issued. The wording
+has been edited for readability. The intent, constraints and decisions are as given.
+Routine conversational turns are left out: confirmations, progress checks and merge
+approvals. What the assistant produced for each step is summarised in
+[`prompt-log.md`](prompt-log.md). The design documents and implementation plans are in
+[`docs/superpowers`](../superpowers).
 
-Short conversational replies are left out: "continue", "in Arabic please", progress
-questions, and button answers such as "Merge". The design and plan documents each prompt
-produced are in [`docs/superpowers`](../superpowers). What the AI did with each prompt is
-summarised in [`prompt-log.md`](prompt-log.md).
+| | |
+|---|---|
+| **Assistant** | Claude Code (Anthropic) |
+| **Model** | Claude Opus 5.5 (`claude-opus-5-5`), for the main session and every subagent |
+| **Target** | Odoo 20.0 Enterprise (`20.0+e-20261105`), installed source used as the reference |
+| **Method** | Spec → plan → test-first implementation → independent review → verification |
+
+## Contents
+
+1. [Engagement setup](#1-engagement-setup) — P1–P3
+2. [Exercise 2: Dynamic Trial Balance](#2-exercise-2-dynamic-trial-balance) — P4–P12
+3. [Exercise 3: POS Enhancements](#3-exercise-3-pos-enhancements) — P13–P18
+4. [Release](#4-release) — P19–P21
+5. [Skills and agents used](#5-skills-and-agents-used)
+6. [Token usage](#6-token-usage)
 
 ---
 
-## 0. Setup
+## 1. Engagement setup
 
 ### P1 — Requirements analysis
 
-> You are a senior Odoo developer reviewing a technical assessment before any code is
-> written. Study the attached PDF (*Odoo Dev Assessments.pdf*) end to end and report:
->
-> 1. What each exercise requires, as a precise checklist of fields, behaviours, outputs,
->    tests and documentation.
-> 2. Gaps, ambiguities and contradictions in the specification, such as a missing mockup,
->    undefined fields or a field type that does not match the described behaviour.
-> 3. Technical risks: version differences, security issues and behaviour of the target
->    Odoo version.
->
-> Do not start implementing. We will pick two exercises after this analysis.
+```text
+ROLE
+Senior Odoo developer performing a pre-implementation review of a technical assessment.
 
-### P2 — Scope
+INPUT
+"Odoo Dev Assessments.pdf" (attached).
 
-> We will deliver **Exercise 2 (Dynamic Trial Balance)** and **Exercise 3 (POS
-> Enhancements)**. Target the Odoo 20.0 Enterprise instance installed on this machine,
-> even though Exercise 3 mentions Odoo 18. Record that deviation in the README. Create a
-> new, separate Git repository. Do not touch my existing Odoo services, databases or
-> configuration.
+TASK
+Analyse the document end to end and produce:
+1. Requirements: a precise, testable checklist per exercise covering fields, behaviours,
+   outputs, test cases and documentation obligations.
+2. Specification gaps: ambiguities, contradictions and missing artefacts (for example a
+   referenced mockup that is not included, or a field type that contradicts the described
+   behaviour).
+3. Technical risks: version drift between the specification and the target Odoo version,
+   security exposure, and framework behaviour that affects the design.
 
-### P3 — Development protocol (applies to every task)
+CONSTRAINTS
+- Analysis only. No code, no scaffolding.
+- Separate facts stated in the document from your own inferences.
 
-> Act as a senior software architect, senior Python developer, Odoo 20 technical expert,
-> security auditor and independent code reviewer. The goal is reliable, maintainable,
-> secure, production-quality code whose compatibility has been verified.
->
-> 1. **Tools.** Before each task, find the skills and tools available in this environment
->    and actually use the relevant ones: planning, test-driven development, systematic
->    debugging, code review and verification before completion. Never claim a tool ran
->    unless it did. If a tool is unavailable, say so and use the best alternative.
-> 2. **Analyse before you code.** Inspect the project structure, the framework version,
->    dependencies, conventions and existing tests. Never assume a method, field, API or
->    module exists: verify it in the installed Odoo 20 source.
-> 3. **Workflow.** Follow *Analyse → Plan → Implement → Test → Debug → Review → Verify*.
->    Every plan names the files to change, the dependencies, the risks, the required
->    tests and the expected behaviour.
-> 4. **Code.** Clean architecture, proper error handling, secure by default, minimal
->    complexity. Do not modify unrelated code.
-> 5. **Testing.** Run the tests for real. Never report a test as passing without its
->    output.
-> 6. **Safety.** Never run destructive database operations without my explicit approval.
->    Never expose credentials.
-> 7. **Reporting.** End each task with a status report: what was done, how it was
->    verified, and what remains or is a known limitation.
+OUTCOME
+A brief I can use to choose two exercises and to record the assumptions.
+```
+
+### P2 — Scope and environment
+
+```text
+DECISION
+Deliver Exercise 2 (Dynamic Trial Balance) and Exercise 3 (POS Enhancements).
+
+TARGET
+The Odoo 20.0 Enterprise instance installed on this machine. Exercise 3 references Odoo 18.
+Implement for Odoo 20 and record the deviation and its consequences in the README.
+
+ENVIRONMENT RULES
+- Create a new, dedicated Git repository.
+- Use a separate configuration, port and databases for development and tests.
+- Do not modify, restart or write to any existing Odoo service, database or configuration
+  file on this machine.
+```
+
+### P3 — Engineering protocol (applies to every subsequent task)
+
+```text
+ROLE
+Operate as a senior software architect, senior Python developer, Odoo 20 technical expert,
+security auditor and independent code reviewer. The objective is reliable, maintainable,
+secure, production-grade code whose compatibility has been verified.
+
+1. TOOLING
+   Before each task, find the skills and tools available in this environment and use the
+   relevant ones: planning, test-driven development, systematic debugging, code review and
+   verification before completion. Never report a tool as used unless it was invoked. If a
+   capability is unavailable, say so and use the strongest available alternative.
+
+2. ANALYSIS BEFORE CODE
+   Inspect the project structure, exact framework version, dependencies, conventions and
+   existing tests. Do not assume any method, field, API or module exists: verify it in the
+   installed Odoo 20 source before relying on it.
+
+3. LIFECYCLE
+   ANALYSE → PLAN → IMPLEMENT → TEST → DEBUG → REVIEW → VERIFY.
+   Every plan states the files affected, dependencies, risks, required tests and expected
+   behaviour.
+
+4. IMPLEMENTATION STANDARDS
+   Clean architecture, explicit error handling, secure defaults, minimal complexity,
+   backward compatibility. No changes to unrelated code.
+
+5. EVIDENCE
+   Run the tests. Never claim a test passed without its output.
+
+6. SAFETY
+   No destructive database operation without my explicit approval. Never expose credentials.
+
+7. REPORTING
+   Close every task with a status report: what was delivered, how it was verified, and what
+   remains open or is a known limitation.
+```
 
 ---
 
-## 1. Exercise 2 — Dynamic Trial Balance
+## 2. Exercise 2: Dynamic Trial Balance
 
-### P4 — Start
+### P4 — Kick-off
 
-> Start with the Dynamic Trial Balance. Follow the protocol: analyse the native Odoo 20
-> Trial Balance first, then propose a design before writing any code.
+```text
+Start with Exercise 2. Apply the engineering protocol.
+First analyse the native Odoo 20 Trial Balance: its handler, its query and its options.
+Then propose an architecture. Do not write code until the design is approved.
+```
 
 ### P5 — Acceptance criteria
 
-> The reviewer must conclude that the developer understands Odoo accounting, not only
-> Odoo screens. Treat the following as the acceptance criteria and the test strategy.
->
-> **Correctness**
-> - The numbers must equal the native Trial Balance under the same filters, account by
->   account: opening debit/credit, period debit/credit and closing debit/credit.
->   Comparing totals alone is not acceptable, because errors can cancel each other out.
-> - Keep these separate: **opening balance** (everything before the period start),
->   **period movement** (inside the period) and **closing balance** (opening plus
->   movement). Respect how Odoo handles opening entries and the carry-forward of prior
->   years' results (undistributed profit/loss).
-> - Build on `account.move.line` and Odoo's accounting rules: account types,
->   receivable/payable, income/expense, equity, multi-company, multi-currency, posted
->   versus draft entries, and date filters.
->
-> **Engineering**
-> - Use the ORM and the Enterprise accounting report engine where they fit, instead of
->   rebuilding Trial Balance logic from scratch.
-> - Respect company and access rules. Avoid unnecessary `sudo()` and ad-hoc SQL that
->   bypasses Odoo's security.
->
-> **Proof**
-> - Provide a reconciliation table (Account | Odoo closing | Custom closing |
->   Difference) where every difference is zero.
-> - Automated tests for: a period with no movement, an account with only an opening
->   balance, an entry on the last day of the period, an account with a reversed sign,
->   several companies, and posted versus draft entries.
-> - Document every remaining difference and its cause.
->
-> Signs of shallow work, all to be avoided: wrong numbers in a polished layout, a single
-> balance column used for everything, a missing opening balance, ignored prior years,
-> ignored posted/draft status, data leaking across companies, and no tests.
+```text
+OBJECTIVE
+A reviewer must conclude that the developer understands Odoo accounting, not only the
+Odoo UI. Treat the following as binding acceptance criteria and as the test strategy.
 
-### P6 — Column layout
+ACCOUNTING CORRECTNESS
+- Figures must equal the native Trial Balance under identical filters, account by account:
+  opening debit/credit, period debit/credit and closing debit/credit. Totals alone are
+  not acceptable evidence, because errors can offset each other.
+- Keep opening balance (before the period start), period movement (within the period) and
+  closing balance (opening plus movement) separate.
+- Respect how Odoo treats opening entries and the carry-forward of prior-year results
+  (undistributed profit/loss).
+- Use account.move.line under Odoo's accounting rules: account types, receivable/payable,
+  income/expense, equity, multi-company, multi-currency, posted versus draft entries and
+  date filters.
 
-> Show Initial Balance and End Balance as separate Debit and Credit columns, like the
-> classic trial balance, not as a single signed balance.
+ENGINEERING
+- Prefer the ORM and the Enterprise accounting report engine to rebuilding Trial Balance
+  logic.
+- Enforce company and access rules. No unnecessary sudo(). No ad-hoc SQL that bypasses
+  Odoo security.
 
-### P7 — Analytic filter rule
+PROOF
+- A reconciliation table (Account | Odoo closing | Custom closing | Difference) in which
+  every difference is zero, generated by a script rather than typed.
+- Automated tests for: a period without movement, an account with only an opening
+  balance, an entry on the last day of the period, an account with a reversed sign, several
+  companies, and posted versus draft entries.
+- Every remaining difference documented with its root cause.
 
-> When an analytic account is selected, report only the share of each journal item that
-> belongs to it. For example, if a line is distributed 60 % to the selected analytic
-> account, report 60 % of the amount, not the full amount. This matches Odoo's analytic
-> distribution logic.
+ANTI-PATTERNS TO AVOID
+Wrong figures in a polished layout. A single balance column used for everything. A missing
+opening balance. Ignored prior years. Ignored posting state. Data leaking across companies.
+No tests.
+```
 
-### P8 — Approve the design
+### P6 — Column presentation
 
-> The design is approved. Write the implementation plan: small, test-first tasks, each
-> with its files, interfaces, tests and expected results.
+```text
+Present Initial Balance and End Balance as separate Debit and Credit columns, as in a
+classic trial balance, not as a single signed balance. A net debit balance goes to Debit,
+a net credit balance goes to Credit, and Balance = Debit − Credit.
+```
+
+### P7 — Analytic filter semantics
+
+```text
+When analytic accounts are selected, report only the share of each journal item that is
+allocated to them. Example: a line distributed 60 % to the selected analytic account
+contributes 60 % of its amount, not 100 %. This must match Odoo's analytic distribution
+logic. If the filtered report no longer balances, say so explicitly in the output.
+```
+
+### P8 — Design approval
+
+```text
+The design is approved. Produce the implementation plan: small test-first tasks, each
+with the files it touches, its interfaces, the tests that prove it and the expected
+results.
+```
 
 ### P9 — Execution mode
 
-> Execute every task in the plan. At the end, have an independent reviewer check the
-> whole branch, and fix the important findings test-first before reporting back.
+```text
+Execute every task in the plan. When all tasks are complete, have an independent reviewer
+review the whole branch. Fix every critical and important finding test-first, then report
+the results and the deferred minor findings.
+```
 
-### P10 — Manual acceptance before moving on
+### P10 — User acceptance testing
 
-> Before we start the next exercise, I want to test the module myself. I am not an
-> accountant. Give me a step-by-step manual test script on the demo database. For each
-> step, give the exact menu path, what to enter and the result I should see, with
-> expected numbers where possible. If a required module (Accounting) is missing,
-> install it on our own test database only.
+```text
+Before starting the next exercise, I will run user acceptance testing myself. Assume the
+tester is not an accountant.
 
-### P11 — Feedback from the manual test
+Provide a step-by-step test script for the demo database. For each step give:
+- the exact menu path;
+- the inputs to enter;
+- the expected result, with expected figures wherever possible.
 
-> Results from the manual test:
-> - In test 3, debit and credit are not equal, although you said they would balance in
->   one of the tests. Explain whether this is expected. If it is a bug, fix it test-first.
-> - Test 4 shows amounts in USD. Confirm this is the intended currency behaviour.
->
-> Then tell me whether any other test is needed before we call the module done.
+If a required application (Accounting) is missing, install it on our test database only.
+```
 
-### P12 — Filters inside the report
+### P11 — Defects from acceptance testing
 
-> While testing, I noticed the filters can only be set in the wizard. Peers' solutions
-> let the user change filters directly in the report (example attached). Add a filter
-> bar to the report itself, using the same mechanism as native Odoo reports. Every
-> change must reload the report and survive a page refresh. Keep PDF and XLSX export
-> consistent with what is on screen.
+```text
+UAT findings:
+1. Scenario 3: total debit does not equal total credit, although balanced totals were
+   stated as an expected result.
+2. Scenario 4: amounts are displayed in USD.
+
+For each finding, decide whether it is expected behaviour or a defect and explain why.
+If it is a defect, reproduce it with a failing test before fixing it. Then confirm whether
+any further test is needed before the module is accepted.
+```
+
+### P12 — In-report filtering
+
+```text
+CHANGE REQUEST
+Filters can currently be set only in the wizard. Comparable solutions let users change
+filters directly in the report (reference attached).
+
+REQUIREMENTS
+- Add a filter bar to the report itself, using the same component mechanism as native
+  Odoo accounting reports.
+- Every change reloads the report immediately and survives a page refresh.
+- PDF and XLSX exports must always match what is on screen.
+- Cover the filter bar with a browser tour.
+```
 
 ---
 
-## 2. Exercise 3 — POS Enhancements
+## 3. Exercise 3: POS Enhancements
 
-### P13 — Start, with the salesperson assignment rules
+### P13 — Kick-off and assignment rules
 
-> Start Exercise 3. Apply these business rules for salesperson assignment:
->
-> 1. **Assign to order.** When the cashier picks a salesperson for the whole order, every
->    existing line gets that salesperson, and every line added afterwards inherits them
->    automatically.
-> 2. **Assign to line.** A salesperson set on a single line applies to that line only and
->    is not inherited by new lines.
-> 3. **Manual changes stick.** If the cashier changes one line from Ahmed to Mohamed,
->    that change is kept. Adding new products must not overwrite it. Using *assign to
->    order* again does overwrite every line.
->
-> Use the assessment's test cases verbatim as acceptance tests. Write the design with a
-> mockup of the receipt (original versus enhanced) for my approval.
+```text
+Start Exercise 3. Apply these business rules for salesperson assignment:
 
-### P14 — Approve and execute
+1. ASSIGN TO ORDER
+   Selecting a salesperson for the order assigns them to every existing line. Every line
+   added afterwards inherits them automatically.
+2. ASSIGN TO LINE
+   A salesperson set on one line applies to that line only and is not inherited by new
+   lines.
+3. MANUAL OVERRIDES PERSIST
+   If a line is reassigned (for example from Ahmed to Mohamed), the change is kept. Adding
+   products never overwrites it. Using "assign to order" again does overwrite every line.
 
-> Design approved. Write the plan, then execute it task by task in this session with
-> test-first development, and run one independent review of the whole branch at the
-> end. If tours need an extra Python package, install it in an isolated, git-ignored
-> folder.
+Use the assessment's test cases verbatim as acceptance tests. Present the design with a
+mockup of the original and enhanced receipts for approval before implementation.
+```
 
-### P15 — Usability feedback: assignment flow
+### P14 — Design approval and execution
 
-> From manual testing in the POS:
-> - I cannot find the per-product salesperson control. Investigate why it is not
->   visible.
-> - When I add the first product to a new order, ask me who the salesperson is. Apply
->   that choice to every product I add afterwards, but still let me change all lines at
->   once or one line at a time.
->
-> Keep refunds, and lines added by code (discounts, tips, imported sale orders), out of
-> this prompt. Cover the new flow with tours that fail before the change.
+```text
+The design is approved. Write the plan, then execute it task by task in this session,
+test-first, with one independent review of the whole branch at the end.
+If browser tours need an additional Python package, install it in an isolated,
+git-ignored directory. Do not install anything system-wide.
+```
 
-### P16 — Checkout and receipt
+### P15 — UX defect and first-product flow
 
-> Second round of manual-testing feedback:
-> - Show the receipt on the payment screen while the customer is paying.
-> - Print the receipt automatically, and email it automatically when the customer has an
->   email address.
-> - Make the receipt cleaner and more modern. Show me a few design options as mockups
->   before implementing.
->
-> Keep the assessment's required products table. Reuse native Odoo mechanisms (automatic
-> printing, the receipt email action) instead of reimplementing them.
+```text
+UAT FINDINGS (POS)
+1. The per-line salesperson control is not visible. Find the root cause.
+2. Workflow change: when the first product is added to a new order, prompt for the
+   salesperson. Apply that choice to every product added afterwards, and keep both
+   options available: change all lines at once, or change one line at a time.
+
+CONSTRAINTS
+- Refund orders and lines added programmatically (global discount, tips, sale-order
+  import) must never trigger the prompt.
+- Cover the new flow with browser tours that fail before the change.
+```
+
+### P16 — Checkout and receipt redesign
+
+```text
+UAT FINDINGS (CHECKOUT)
+1. Show the receipt on the payment screen while the customer is paying, updated live.
+2. Print the receipt automatically, and email it automatically when the customer has a
+   valid email address.
+3. Modernise the receipt layout. Present several design options as mockups before
+   implementing.
+
+CONSTRAINTS
+- Keep the products table required by the assessment.
+- Reuse native mechanisms (automatic receipt printing, the receipt email action) instead
+  of reimplementing them.
+- Each behaviour is configurable per POS.
+```
 
 ### P17 — Salesperson sales report
 
-> Build a report I can use with the salespeople: exactly what each one sold, by product,
-> by day and by any other useful dimension. Propose extra metrics that would help a
-> sales manager, and I will choose which ones to include.
->
-> Constraints: build on Odoo's native POS analysis where possible; net out refunds;
-> show sales without a salesperson as their own group; count completed sales only by
-> default; respect multi-company access.
+```text
+OBJECTIVE
+A report for reviewing salesperson performance: exactly what each salesperson sold, by
+product, by day and by any other useful dimension.
 
-### P18 — Extras chosen
+REQUIREMENTS
+- Build on Odoo's native POS sales analysis so the figures reconcile with it.
+- Net refunds against sales.
+- Show sales without a salesperson as their own group.
+- Default to completed sales only.
+- Enforce multi-company access rules.
 
-> Include two of the proposed extras:
-> 1. **Commission rate** per salesperson, applied to sales without tax. A rate change
->    must not rewrite past commissions.
-> 2. **Order count and average order value** per salesperson.
->
-> Leave out the PDF statement and the smart button.
+ALSO
+Propose additional metrics a sales manager would value. I will select which to include.
+```
+
+### P18 — Scope of extras
+
+```text
+Include:
+1. A commission rate per salesperson, applied to sales excluding tax. The rate is frozen
+   on each sale line at the time of sale, so a later rate change never alters past
+   commissions. A refund uses the rate of the sale it refunds.
+2. Order count and average order value per salesperson. Refund orders reduce sales but
+   do not count as orders.
+
+Exclude the PDF statement and the smart button.
+```
 
 ---
 
-## 3. Release
+## 4. Release
 
-### P19 — Handover explanation
+### P19 — Handover
 
-> Explain everything that was built in plain language: what each module does, where to
-> find each feature in the menus, and how to set it up. One example question: where do
-> I set the commission rate?
+```text
+Write a functional handover of everything delivered: what each module does, where each
+feature is in the menus, and how to configure it (for example, where the commission rate
+is set). Write it for a business user, not a developer.
+```
 
-### P20 — Compliance check
+### P20 — Compliance audit
 
-> Check the repository against the assessment PDF, item by item: features, README
-> sections, installation, configuration, testing strategy, demo data, the GenAI log and
-> the question about conflicts between the two POS modules. List anything missing
-> before we submit.
+```text
+Audit the repository against the assessment PDF item by item: features, README sections
+(features, installation, configuration, testing strategy), demo data, the GenAI log and
+the question about conflicts between the two POS modules. List every gap before
+submission. Do not report an item as complete without evidence.
+```
 
-### P21 — Publish
+### P21 — Publication
 
-> Push the repository to the public GitHub repository I created
-> (`ziadelawdy/odoo-dev-assessment`). Confirm the remote matches the local `main` and
-> that the README opens without signing in.
+```text
+Publish the repository to github.com/ziadelawdy/odoo-dev-assessment (public).
+Verify that the remote main matches the local main and that the README is reachable
+without authentication.
+```
 
-### P22 — Prompt documentation
+---
 
-> Add the prompts I used to `docs/`, in English, rewritten as clean, professional
-> prompts that keep their original meaning. Link them from the README and the prompt
-> log.
+## 5. Skills and agents used
+
+The protocol in P3 required the assistant to use the available skills for real. These were
+invoked during the project:
+
+| Skill | Used for |
+|---|---|
+| `superpowers:using-superpowers` | Choosing the right skill at the start of each task. |
+| `superpowers:brainstorming` | Turning each request into an approved design: questions, mockups, a written spec, and a "builder check" by a second agent. |
+| `superpowers:writing-plans` | Turning each approved design into a test-first implementation plan with interfaces and a review focus. |
+| `superpowers:executing-plans` | Executing the plans task by task, keeping a progress ledger and recording every deviation as a ruling. |
+| `superpowers:test-driven-development` | Writing each test first and watching it fail before writing the code. Some fixes were also proven by deliberate mutations. |
+| `superpowers:requesting-code-review` | An independent whole-branch review by a fresh agent before each merge. |
+| `superpowers:verification-before-completion` | Claiming nothing without running the command and reading its output. |
+| `superpowers:finishing-a-development-branch` | Re-running the suite on the merged result before integrating each branch. |
+
+| Agent | Used for |
+|---|---|
+| `Explore` | Mapping the Odoo 20 extension points across the installed source (report engine, POS store, receipt pipeline). |
+| `general-purpose` | Builder checks on the designs, and the independent code reviews. |
+
+## 6. Token usage
+
+Counted from the session logs, main sessions and subagents included, with every model
+response counted once.
+
+| Measure | Tokens |
+|---|---:|
+| Output (generated by the model) | 851,667 |
+| Fresh input (new context sent to the model) | 4,973,695 |
+| Cached input (context re-read from the prompt cache) | 413,173,588 |
+| **Total processed** | **418,998,950** |
+| Model requests | 1,142 |
+
+Most of the total is cached input. In a long agentic session, each step re-reads the
+conversation and source files from the prompt cache.
