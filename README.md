@@ -13,7 +13,12 @@ Two of the three exercises were selected:
 for Exercise 3. The modules target the Odoo 20 instance used for development and testing,
 and every framework API was checked against the installed Odoo 20 source.
 
-Design notes, plans and the GenAI prompt log are in [`docs/`](docs).
+Design notes, plans and the GenAI documentation are in [`docs/`](docs):
+
+- [`docs/genai/prompts.md`](docs/genai/prompts.md): the prompts used, in order, in English.
+- [`docs/genai/prompt-log.md`](docs/genai/prompt-log.md): what the AI produced for each prompt.
+- [`docs/superpowers/specs`](docs/superpowers/specs) and [`docs/superpowers/plans`](docs/superpowers/plans):
+  the design and the implementation plan of each feature.
 
 ---
 

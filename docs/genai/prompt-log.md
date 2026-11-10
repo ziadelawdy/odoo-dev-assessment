@@ -3,7 +3,7 @@
 **Tool:** Claude Code (Anthropic), model Claude Opus 5.5, running against the local
 Odoo 20.0 Enterprise source. The conversation was in Egyptian Arabic; prompts below are
 faithful English summaries, in order. Outputs are summarised, with links to the artefacts
-they produced.
+they produced. The full prompts, rewritten in English, are in [`prompts.md`](prompts.md).
 
 The workflow was set up so the AI could not "vibe" its way past correctness. It worked as
 brainstorm → written design → reviewed plan → test-first implementation → independent
