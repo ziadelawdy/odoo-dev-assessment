@@ -48,6 +48,15 @@ export class AzkReceiptPreview extends Component {
         const data = this.pos.ticketPrinter.getOrderReceiptData(this.props.order);
         // the order is still a draft: hide the "Pro forma receipt" label
         data.conditions.azk_preview = true;
+        // a new srcdoc reloads the document at the top: keep the cashier's
+        // scroll position (the totals are at the bottom of a long receipt)
+        const scrollTop = iframe.contentDocument?.scrollingElement?.scrollTop || 0;
+        iframe.onload = () => {
+            const scroller = iframe.contentDocument?.scrollingElement;
+            if (scroller && scrollTop) {
+                scroller.scrollTop = scrollTop;
+            }
+        };
         iframe.srcdoc = renderToElement("point_of_sale.pos_order_receipt", data).outerHTML;
     }
 }

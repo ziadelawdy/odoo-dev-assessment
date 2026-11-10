@@ -8,11 +8,17 @@ patch(PosStore.prototype, {
      * Ask when a product is added to an order that has no salesperson and
      * whose cashier has not answered the question yet (closing the popup is
      * not an answer; "No salesperson" is).
+     * Only for products the cashier picks: lines added by code (configure
+     * false: discount, tip, sale order import...) and refund orders (their
+     * lines keep the original seller) never ask.
      */
-    azkShouldAskSalesperson(vals, order) {
+    azkShouldAskSalesperson(vals, order, opts = {}, configure = true) {
         return Boolean(
             this.config.active_salesperson_feature &&
                 order &&
+                configure !== false &&
+                !opts.force &&
+                !order.isRefund &&
                 !order.salesperson_id &&
                 !order.uiState?.azkSalespersonAnswered &&
                 !("salesperson_id" in vals) &&
@@ -21,7 +27,7 @@ patch(PosStore.prototype, {
     },
     /** New lines are credited to the order salesperson, if one was set. */
     async addLineToOrder(vals, order, opts = {}, configure = true) {
-        if (this.azkShouldAskSalesperson(vals, order)) {
+        if (this.azkShouldAskSalesperson(vals, order, opts, configure)) {
             // the answer becomes the order salesperson (all lines so far);
             // "No salesperson" (null) stops the question for this order,
             // closing the popup (undefined) asks again with the next product

@@ -65,6 +65,20 @@ class TestSalespersonReviewUi(TestPointOfSaleHttpCommon):
         self.assertLess(refund.lines.qty, 0)
         self.assertEqual(refund.lines.salesperson_id, self.sp_a)
 
+    def test_refund_order_does_not_prompt(self):
+        """Second review: the first-product question must not re-credit refund lines."""
+        self.start_pos_tour('AzkSalespersonRefundNoPromptTour')
+        _sale, refund = self._orders()[-2:]
+        self.assertLess(refund.lines.qty, 0)
+        self.assertEqual(refund.lines.salesperson_id, self.sp_a)
+
+    def test_code_added_line_does_not_prompt(self):
+        """Second review: lines added by code (configure=False) never open the question."""
+        self.start_pos_tour('AzkSalespersonCodeLineNoPromptTour')
+        order = self._orders()[-1]
+        self.assertEqual(len(order.lines), 2)
+        self.assertEqual(order.lines.salesperson_id, self.sp_a)
+
 
 @tagged('post_install', '-at_install')
 class TestSalespersonSmallScreen(TestPointOfSaleHttpCommon):

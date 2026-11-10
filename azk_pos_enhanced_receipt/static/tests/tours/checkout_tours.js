@@ -151,3 +151,51 @@ registry.category("web_tour.tours").add("AzkAutoEmailUnsyncedTour", {
             Chrome.endTour(),
         ].flat(Infinity),
 });
+
+// ---------------------------------------------------------------------------
+// Review fix: a re-render keeps the preview scroll position (totals at the bottom)
+// ---------------------------------------------------------------------------
+
+const PRODUCTS = [
+    "Whiteboard Pen", "Letter Tray", "Desk Pad", "Desk Organizer", "Wall Shelf Unit",
+    "Small Shelf", "Magnetic Board", "Monitor Stand",
+];
+
+registry.category("web_tour.tours").add("AzkPaymentPreviewScrollTour", {
+    steps: () =>
+        [
+            open(),
+            PRODUCTS.map((name) => ProductScreen.clickDisplayedProduct(name)),
+            ProductScreen.clickPayButton(),
+            checkPreview("all products", { texts: ["Monitor Stand"] }),
+            {
+                content: "scroll the preview to the totals",
+                trigger: ".payment-screen .azk-receipt-preview iframe",
+                run: () => {
+                    const scroller = previewDoc().scrollingElement;
+                    if (scroller.scrollHeight <= scroller.clientHeight) {
+                        throw new Error("the receipt should be taller than the preview");
+                    }
+                    scroller.scrollTop = scroller.scrollHeight;
+                },
+            },
+            PaymentScreen.clickPaymentMethod("Bank"),
+            checkPreview("re-rendered", { texts: ["Bank"] }),
+            {
+                content: "the preview is still scrolled down after the re-render",
+                trigger: ".payment-screen .azk-receipt-preview iframe",
+                run: async () => {
+                    for (let attempt = 0; attempt < 30; attempt++) {
+                        if (previewDoc().scrollingElement.scrollTop > 0) {
+                            return;
+                        }
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                    }
+                    throw new Error("the preview jumped back to the top");
+                },
+            },
+            PaymentScreen.clickValidate(),
+            FeedbackScreen.isShown(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});

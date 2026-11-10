@@ -355,3 +355,72 @@ registry.category("web_tour.tours").add("AzkSalespersonSmallScreenTour", {
             lineShows("Whiteboard Pen", "Salesperson A"),
         ].flat(Infinity),
 });
+
+// ---------------------------------------------------------------------------
+// Review fixes: no prompt on refunds or on lines added by code
+// ---------------------------------------------------------------------------
+
+registry.category("web_tour.tours").add("AzkSalespersonRefundNoPromptTour", {
+    steps: () =>
+        [
+            open(),
+            assignOrder("Salesperson A"),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            pay(),
+            FeedbackScreen.clickNextOrder(),
+            Chrome.clickOrders(),
+            TicketScreen.isReady(),
+            TicketScreen.selectFilter("Paid"),
+            TicketScreen.selectOrder("001"),
+            inLeftSide([
+                ...Order.hasLine({ productName: "Whiteboard Pen", withClass: ".selected" }),
+                Numpad.click("1"),
+            ]),
+            TicketScreen.confirmRefund(),
+            PaymentScreen.isShown(),
+            PaymentScreen.clickBackToProductScreen(),
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            {
+                content: "native refund guard, not the salesperson question",
+                trigger: '.modal:contains("validate the refund")',
+            },
+            {
+                content: "no salesperson popup on a refund order",
+                trigger: negate(".modal .selection-item"),
+            },
+            { content: "close the alert", trigger: ".modal .modal-footer .btn-primary", run: "click" },
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            ProductScreen.clickPayButton(),
+            PaymentScreen.clickPaymentMethod("Bank"),
+            PaymentScreen.clickValidate(),
+            FeedbackScreen.isShown(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonCodeLineNoPromptTour", {
+    steps: () =>
+        [
+            open(),
+            {
+                content: "a line added by code (configure=false, e.g. discount, tip) does not ask",
+                trigger: ".pos .product-screen",
+                run: () => {
+                    const tmpl = posmodel.models["product.template"].find((p) => p.name === "Letter Tray");
+                    posmodel.addLineToOrder({ product_tmpl_id: tmpl }, posmodel.getOrder(), {}, false);
+                },
+            },
+            lineShowsNothing("Letter Tray"),
+            {
+                content: "no salesperson popup for the code-added line",
+                trigger: negate(".modal .selection-item"),
+            },
+            // the cashier's own first product still asks
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            choose("Salesperson A"),
+            lineShows("Letter Tray", "Salesperson A"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});

@@ -42,6 +42,11 @@ class TestCheckoutUi(TestPointOfSaleHttpCommon):
         self.main_pos_config.azk_payment_receipt_preview = False
         self.start_pos_tour('AzkPaymentPreviewOffTour')
 
+    def test_payment_preview_keeps_scroll(self):
+        """Review fix: a re-render must not jump back to the top (the totals are at the bottom)."""
+        self.main_pos_config.azk_payment_receipt_preview = True
+        self.start_pos_tour('AzkPaymentPreviewScrollTour')
+
     # ------------------------------------------------------------------
     # G3: automatic email
     # ------------------------------------------------------------------
