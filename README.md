@@ -222,7 +222,18 @@ own. Installed together, they compose with no bridge module (see *Conflicts* bel
 - **Offline:** the allowed salespersons are loaded with the POS data, and assignments are stored
   on the order and synced with it. Nothing calls the server.
 - **In the POS (feature on):**
-  - a person icon on every order line assigns a salesperson to **that line only**;
+  - adding the **first product** of an order opens the salesperson popup. The person chosen
+    becomes the order salesperson (for every line so far), so every product added after it gets
+    the same person.
+    - *No salesperson* adds the product unassigned, and the popup is not shown again for that
+      order.
+    - Closing the popup is not an answer: the next product asks again.
+    - Refund orders keep the original seller and never ask. Lines added by code also never
+      ask: global discount, tips, sale-order import.
+    - The "answered" state lives in the browser only, so an order reloaded from the server may
+      ask once more;
+  - a salesperson button under every order line (the name, or *Add salesperson*) changes
+    **that line only**;
   - **Assign Salesperson to Order** assigns a salesperson to **every line**, and also becomes the
     order salesperson. **Lines added afterwards inherit it.** A line changed individually keeps
     its value.
@@ -245,16 +256,36 @@ own. Installed together, they compose with no bridge module (see *Conflicts* bel
   - *Receipt Logo* (`receipt_logo`);
   - *Receipt Company Name* / *Details* (`company_name`, `company_details`);
   - *Show Customer Details* (`show_customer_details`).
-- **Enhanced layout**, from top to bottom:
-  1. Receipt logo, falling back to the standard logo when none is uploaded.
-  2. Company name and details.
-  3. Customer name and address, when enabled.
-  4. Ticket and date.
-  5. A **table** with Product | Qty | Price | Total. The gift/basic receipt has Product | Qty
-     only.
+- **Enhanced layout**, from top to bottom. Sections are separated by dashed rules (design "A",
+  chosen by the user from three mockups):
+  1. Receipt logo, falling back to the standard logo when none is uploaded. Odoo's default
+     *Your logo* placeholder is never printed.
+  2. Company name (large), details and tax ID.
+  3. Order block: ticket, date and cashier.
+  4. Customer name and address, when enabled.
+  5. A **table** with Product | Qty | Price | Total.
+     - Product names are bold at normal size, so they do not wrap on an 80 mm ticket.
+     - Numbers sit in narrow right-aligned columns.
+     - Secondary lines (salesperson, discount, note) are small and muted.
+     - The gift/basic receipt has Product | Qty only.
   6. Totals, taxes, payments and footer, as native.
 
-  The native customer block and the footer company block are replaced, not duplicated.
+  The native ticket, cashier, customer and footer company blocks are replaced, not duplicated.
+  The layout uses tables (no flexbox) so the emailed image, rendered by wkhtmltoimage, looks
+  the same.
+- **Checkout options** (per POS, *Point of Sale › Configuration › Point of Sale*):
+  - *Receipt Preview on Payment Screen* (`azk_payment_receipt_preview`, on by default). On
+    large screens the payment screen gets a third column with the receipt exactly as it will
+    print, updated live as payments are added. The draft "Pro forma" label is hidden there.
+  - *Email Receipt Automatically* (`azk_auto_email_receipt`). After *Validate*, the receipt is
+    emailed to the customer when the customer has a valid email. It uses the native
+    `action_send_receipt`, does not block the cashier and shows a notification. Orders still
+    offline are skipped; the native *Send* button can still be used later. This needs an
+    outgoing mail server.
+  - **Printing without a click** uses Odoo's own *Automatic Receipt Printing*
+    (`iface_print_auto`). With a receipt printer (IoT/ePOS) it prints silently. In a plain
+    browser with no printer, the browser's print dialog opens by itself after *Validate*,
+    because browsers never print without asking.
 - **Option off:** the native receipt, unchanged.
 - **Security:** company name and details are `Html` fields with Odoo's sanitizer, instead of the
   spec's *Text*, because the spec allows HTML. Scripts and event handlers are stripped on save,
@@ -279,10 +310,11 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 ### Manual test steps (assessment §4.2)
 
 1. **Visibility.** Open a session on each POS and sell something.
-   - The line icon and the *Assign Salesperson to Order* button appear only when Salesperson
-     Assignment is on.
+   - The first-product popup, the line button and the *Assign Salesperson to Order* button
+     appear only when Salesperson Assignment is on.
    - The receipt shows the branded table layout only when Customized Receipt is on.
-2. **Per line.** Add *X* and *Y*. Click the person icon on X and pick A; on Y pick B. Pay.
+2. **Per line.** Add *X* (pick *No salesperson* in the first-product popup) and *Y*. Click the
+   salesperson button under X and pick A; under Y pick B. Pay.
    - The receipt shows A under X and B under Y.
    - *Point of Sale › Orders › Order lines* shows the same.
 3. **Global overwrites.** Assign A and B per line, then *Assign Salesperson to Order* → C. Both
@@ -294,14 +326,14 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 
 ### Automated tests
 
-45 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
+61 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
 The POS tours drive Chrome through real sales.
 
 | Module / file | Covers |
 |---|---|
 | `azk_pos_salesperson/tests/test_salesperson_backend.py` | Required name. Loads only the allowed salespersons, and none when the feature is off. Order sync stores the line and order salesperson. Access rights (POS user read, manager write). Backend views. |
 | `azk_pos_salesperson/tests/test_salesperson_receipt.py` | Receipt data and server-rendered receipt: name under the product; hidden when the feature is off or the line is unassigned. |
-| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
+| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. First-product popup (choose or skip). New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. Settings write-through. No name clash with native fields. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout, native when off, customer hidden, logo fallback, basic receipt table, no duplicated company info or unit price. |
 | `azk_pos_salesperson/tests/test_review_fixes.py` | Regressions from the independent review. Editing a combo keeps its children credited. POS refunds keep the salesperson. The order button is available on small screens (phone/tablet viewport tour). Multi-company checks. Employee records are never loaded into the POS. |

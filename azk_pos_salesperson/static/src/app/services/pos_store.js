@@ -1,9 +1,44 @@
 import { patch } from "@web/core/utils/patch";
+import { _t } from "@web/core/l10n/translation";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
+import { selectSalesperson } from "@azk_pos_salesperson/app/utils/salesperson_popup";
 
 patch(PosStore.prototype, {
+    /**
+     * Ask when a product is added to an order that has no salesperson and
+     * whose cashier has not answered the question yet (closing the popup is
+     * not an answer; "No salesperson" is).
+     * Only for products the cashier picks: lines added by code (configure
+     * false: discount, tip, sale order import...) and refund orders (their
+     * lines keep the original seller) never ask.
+     */
+    azkShouldAskSalesperson(vals, order, opts = {}, configure = true) {
+        return Boolean(
+            this.config.active_salesperson_feature &&
+                order &&
+                configure !== false &&
+                !opts.force &&
+                !order.isRefund &&
+                !order.salesperson_id &&
+                !order.uiState?.azkSalespersonAnswered &&
+                !("salesperson_id" in vals) &&
+                this.models["pos.sale.person"].getAll().length
+        );
+    },
     /** New lines are credited to the order salesperson, if one was set. */
     async addLineToOrder(vals, order, opts = {}, configure = true) {
+        if (this.azkShouldAskSalesperson(vals, order, opts, configure)) {
+            // the answer becomes the order salesperson (all lines so far);
+            // "No salesperson" (null) stops the question for this order,
+            // closing the popup (undefined) asks again with the next product
+            const chosen = await selectSalesperson(this, this.dialog, null, _t("Who is the salesperson for this order?"));
+            if (chosen !== undefined) {
+                order.uiState.azkSalespersonAnswered = true;
+            }
+            if (chosen) {
+                order.setSalespersonOnAllLines(chosen);
+            }
+        }
         const person = this.config.active_salesperson_feature ? order?.salesperson_id : false;
         const inherit = person && !("salesperson_id" in vals);
         if (inherit) {

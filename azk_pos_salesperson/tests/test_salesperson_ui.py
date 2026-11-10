@@ -79,3 +79,25 @@ class TestSalespersonUi(TestPointOfSaleHttpCommon):
         self.main_pos_config.active_salesperson_feature = False
         self.start_pos_tour('AzkSalespersonHiddenTour')
         self.assertFalse(self._last_order().lines.salesperson_id)
+
+    def test_first_product_prompts_salesperson(self):
+        self.start_pos_tour('AzkSalespersonFirstProductTour')
+        order = self._last_order()
+        self.assertEqual(order.salesperson_id, self.sp_a)
+        lines = self._salesperson_by_product(order)
+        self.assertEqual(lines['Whiteboard Pen'], self.sp_a)
+        self.assertEqual(lines['Letter Tray'], self.sp_b)
+
+    def test_first_product_dismiss_asks_again(self):
+        self.start_pos_tour('AzkSalespersonFirstProductDismissTour')
+        order = self._last_order()
+        self.assertEqual(len(order.lines), 3)
+        self.assertEqual(order.lines.salesperson_id, self.sp_a)
+        self.assertEqual(order.salesperson_id, self.sp_a)
+
+    def test_first_product_prompt_can_be_skipped(self):
+        self.start_pos_tour('AzkSalespersonFirstProductSkipTour')
+        order = self._last_order()
+        self.assertEqual(len(order.lines), 2)
+        self.assertFalse(order.lines.salesperson_id)
+        self.assertFalse(order.salesperson_id)

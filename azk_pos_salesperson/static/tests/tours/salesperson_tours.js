@@ -26,6 +26,12 @@ const assignLine = (product, person) => [
     },
 ];
 
+const choose = (person) => ({
+    content: `choose ${person} in the salesperson popup`,
+    trigger: `.modal .selection-item:contains("${person}")`,
+    run: "click",
+});
+
 const assignOrder = (person) => [
     {
         content: "open order salesperson popup",
@@ -63,6 +69,8 @@ registry.category("web_tour.tours").add("AzkSalespersonLineTour", {
         [
             open(),
             ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             assignLine("Whiteboard Pen", "Salesperson A"),
             lineShows("Whiteboard Pen", "Salesperson A"),
             ProductScreen.clickDisplayedProduct("Letter Tray"),
@@ -79,6 +87,8 @@ registry.category("web_tour.tours").add("AzkSalespersonGlobalTour", {
         [
             open(),
             ProductScreen.clickDisplayedProduct("Desk Organizer"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             assignLine("Desk Organizer", "Salesperson A"),
             ProductScreen.clickDisplayedProduct("Wall Shelf Unit"),
             assignLine("Wall Shelf Unit", "Salesperson B"),
@@ -97,6 +107,8 @@ registry.category("web_tour.tours").add("AzkSalespersonNoneTour", {
         [
             open(),
             ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             ProductScreen.clickDisplayedProduct("Letter Tray"),
             lineShowsNothing("Whiteboard Pen"),
             lineShowsNothing("Letter Tray"),
@@ -245,15 +257,170 @@ registry.category("web_tour.tours").add("AzkSalespersonRefundTour", {
         ].flat(Infinity),
 });
 
+// ---------------------------------------------------------------------------
+// First product prompt + visible line button (user feedback)
+// ---------------------------------------------------------------------------
+
+registry.category("web_tour.tours").add("AzkSalespersonFirstProductTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            choose("Salesperson A"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            {
+                content: "the chosen person becomes the order salesperson",
+                trigger: '.azk-assign-order-salesperson:contains("Salesperson A")',
+            },
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            lineShows("Letter Tray", "Salesperson A"),
+            {
+                content: "no prompt for the following products",
+                trigger: negate(".modal .selection-item"),
+            },
+            // one line can still be changed on its own
+            assignLine("Letter Tray", "Salesperson B"),
+            lineShows("Letter Tray", "Salesperson B"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+const dismiss = () => ({
+    content: "close the salesperson popup without choosing",
+    trigger: '.modal:has(.selection-item) [aria-label="Close"]',
+    run: "click",
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonFirstProductDismissTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            dismiss(),
+            {
+                content: "the line is unassigned",
+                trigger: `${line("Whiteboard Pen")} .azk-salesperson-btn:contains("Add salesperson")`,
+            },
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            // closing the popup is not an answer: ask again
+            dismiss(),
+            ProductScreen.clickDisplayedProduct("Desk Pad"),
+            choose("Salesperson A"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            lineShows("Letter Tray", "Salesperson A"),
+            lineShows("Desk Pad", "Salesperson A"),
+            {
+                content: "the choice becomes the order salesperson",
+                trigger: '.azk-assign-order-salesperson:contains("Salesperson A")',
+            },
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonFirstProductSkipTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            choose("No salesperson"),
+            {
+                content: "an unassigned line shows a visible button to add one",
+                trigger: `${line("Whiteboard Pen")} .azk-salesperson-btn:contains("Add salesperson")`,
+            },
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            {
+                content: "skipping once means no prompt for the next products",
+                trigger: negate(".modal .selection-item"),
+            },
+            lineShowsNothing("Letter Tray"),
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
 registry.category("web_tour.tours").add("AzkSalespersonSmallScreenTour", {
     steps: () =>
         [
             open(),
             ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             ProductScreen.clickReview(),
             ProductScreen.clickControlButtonMore(),
             assignOrder("Salesperson A"),
             // the "more" dialog closes after the choice: check the result on the cart line
             lineShows("Whiteboard Pen", "Salesperson A"),
+        ].flat(Infinity),
+});
+
+// ---------------------------------------------------------------------------
+// Review fixes: no prompt on refunds or on lines added by code
+// ---------------------------------------------------------------------------
+
+registry.category("web_tour.tours").add("AzkSalespersonRefundNoPromptTour", {
+    steps: () =>
+        [
+            open(),
+            assignOrder("Salesperson A"),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            pay(),
+            FeedbackScreen.clickNextOrder(),
+            Chrome.clickOrders(),
+            TicketScreen.isReady(),
+            TicketScreen.selectFilter("Paid"),
+            TicketScreen.selectOrder("001"),
+            inLeftSide([
+                ...Order.hasLine({ productName: "Whiteboard Pen", withClass: ".selected" }),
+                Numpad.click("1"),
+            ]),
+            TicketScreen.confirmRefund(),
+            PaymentScreen.isShown(),
+            PaymentScreen.clickBackToProductScreen(),
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            {
+                content: "native refund guard, not the salesperson question",
+                trigger: '.modal:contains("validate the refund")',
+            },
+            {
+                content: "no salesperson popup on a refund order",
+                trigger: negate(".modal .selection-item"),
+            },
+            { content: "close the alert", trigger: ".modal .modal-footer .btn-primary", run: "click" },
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            ProductScreen.clickPayButton(),
+            PaymentScreen.clickPaymentMethod("Bank"),
+            PaymentScreen.clickValidate(),
+            FeedbackScreen.isShown(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonCodeLineNoPromptTour", {
+    steps: () =>
+        [
+            open(),
+            {
+                content: "a line added by code (configure=false, e.g. discount, tip) does not ask",
+                trigger: ".pos .product-screen",
+                run: () => {
+                    const tmpl = posmodel.models["product.template"].find((p) => p.name === "Letter Tray");
+                    posmodel.addLineToOrder({ product_tmpl_id: tmpl }, posmodel.getOrder(), {}, false);
+                },
+            },
+            lineShowsNothing("Letter Tray"),
+            {
+                content: "no salesperson popup for the code-added line",
+                trigger: negate(".modal .selection-item"),
+            },
+            // the cashier's own first product still asks
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            choose("Salesperson A"),
+            lineShows("Letter Tray", "Salesperson A"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            pay(),
+            Chrome.endTour(),
         ].flat(Infinity),
 });

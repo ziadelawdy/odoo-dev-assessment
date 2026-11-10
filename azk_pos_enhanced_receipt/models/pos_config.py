@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class PosConfig(models.Model):
@@ -21,3 +21,22 @@ class PosConfig(models.Model):
         string='Show Customer Details',
         help="Print the customer's name and address on the customized receipt.",
     )
+    azk_payment_receipt_preview = fields.Boolean(
+        string='Receipt Preview on Payment Screen', default=True,
+        help='Show the receipt, updated live, next to the payment on large screens.',
+    )
+    azk_logo_is_placeholder = fields.Boolean(
+        compute='_compute_azk_logo_is_placeholder',
+        help="Technical: the receipt logo is Odoo's default \"Your logo\" image (or empty).",
+    )
+    azk_auto_email_receipt = fields.Boolean(
+        string='Email Receipt Automatically',
+        help='After validation, email the receipt to the customer when the customer has an email address. '
+             'Needs an outgoing mail server.',
+    )
+
+    @api.depends('logo')
+    def _compute_azk_logo_is_placeholder(self):
+        placeholder = self.env['res.company']._get_logo().content
+        for config in self:
+            config.azk_logo_is_placeholder = not config.logo or config.logo.content == placeholder

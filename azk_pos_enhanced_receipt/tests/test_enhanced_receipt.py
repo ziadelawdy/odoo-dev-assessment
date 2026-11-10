@@ -1,4 +1,5 @@
 from odoo.tests import tagged
+from odoo.tools import BinaryBytes
 from odoo.tools.image import image_data_uri
 
 from .common import AzkEnhancedReceiptCommon
@@ -29,7 +30,8 @@ class TestEnhancedReceipt(AzkEnhancedReceiptCommon):
         self._enable(use_customized_receipt=False)
         html = self._render(self._sync_order([(self.product_x, 1)], customer=self.customer))
         # elements, not CSS selectors (the receipt <style> always carries the rules)
-        for marker in ('class="azk-company', 'class="azk-customer', 'class="azk-lines-table', 'NOX Trading'):
+        for marker in ('class="azk-company', 'class="azk-customer', 'class="azk-lines-table', 'NOX Trading',
+                       'class="azk-sep', 'class="azk-order-info'):
             self.assertNotIn(marker, html, marker)
         self.assertIn('name="standard-line"', html)
         self.assertIn('name="standard-unit-price"', html)
@@ -68,6 +70,26 @@ class TestEnhancedReceipt(AzkEnhancedReceiptCommon):
         html = self._render(self._sync_order([(self.product_x, 1)]))
         self.assertIn('EG123456789', html)
         self.assertEqual(html.count('EG123456789'), 1, 'printed once')
+
+    def test_placeholder_logo_hidden(self):
+        """No receipt logo and the company still on Odoo's "Your logo" placeholder: print no logo."""
+        placeholder = self.env['res.company']._get_logo()
+        self.config.logo = BinaryBytes(placeholder.content)
+        self._enable(receipt_logo=False)
+        html = self._render(self._sync_order([(self.product_x, 1)]))
+        logo_block = html[html.index('name="logo"'):]
+        logo_block = logo_block[:logo_block.index('</div>')]
+        self.assertNotIn('<img', logo_block)
+
+    def test_design_a_sections(self):
+        self._enable()
+        order = self._sync_order([(self.product_x, 1)], customer=self.customer)
+        html = self._render(order)
+        self.assertGreaterEqual(html.count('class="azk-sep'), 3, 'dashed separators between the sections')
+        self.assertIn('class="azk-order-info', html)
+        self.assertEqual(html.count(order.pos_reference), 1, 'the ticket reference is printed once, in the order block')
+        self.assertNotIn('name="cashier_name"', html, 'the cashier is printed in the order block')
+        self.assertIn('azk-lines-table', html)
 
     def test_unit_price_not_duplicated_in_table(self):
         self._enable()

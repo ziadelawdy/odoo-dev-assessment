@@ -1,23 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Header: company name/details after the logo; native customer block replaced. -->
+    <!-- Header (design A): company block, dashed rule, order block (ticket,
+         date, cashier), customer, dashed rule. The native ticket, cashier and
+         customer blocks are replaced. Tables, not flexbox: the email image is
+         rendered by wkhtmltoimage. -->
     <template id="pos_order_receipt_header_enhanced" inherit_id="point_of_sale.pos_order_receipt_header">
         <xpath expr="//div[@name='logo']" position="after">
-            <div t-if="conditions.get('azk_enhanced')" class="azk-company w-100 text-center mb-2">
-                <div t-if="extra_data.get('azk_company_name')" class="azk-company-name text-large fw-bold" t-out="extra_data['azk_company_name']"/>
-                <div t-if="extra_data.get('azk_company_details')" class="azk-company-details text-small" t-out="extra_data['azk_company_details']"/>
-                <!-- The footer company block is hidden in enhanced mode: keep the legal tax ID here. -->
-                <div t-if="company.get('vat')" class="azk-company-vat text-small">
-                    <t t-out="extra_data.get('vat_label') or 'Tax ID'"/>: <t t-out="company['vat']"/>
+            <t t-if="conditions.get('azk_enhanced')">
+                <div class="azk-company w-100 text-center">
+                    <div t-if="extra_data.get('azk_company_name')" class="azk-company-name" t-out="extra_data['azk_company_name']"/>
+                    <div t-if="extra_data.get('azk_company_details')" class="azk-company-details azk-muted" t-out="extra_data['azk_company_details']"/>
+                    <!-- The footer company block is hidden in enhanced mode: keep the legal tax ID here. -->
+                    <div t-if="company.get('vat')" class="azk-company-vat azk-muted">
+                        <t t-out="extra_data.get('vat_label') or 'Tax ID'"/>: <t t-out="company['vat']"/>
+                    </div>
                 </div>
-            </div>
-            <div t-if="conditions.get('azk_show_customer') and extra_data.get('azk_customer')" class="azk-customer w-100 text-start mb-2 text-small">
-                <div class="fw-bold">Customer: <span t-out="extra_data['azk_customer']['name']"/></div>
-                <div t-foreach="extra_data['azk_customer']['address_lines']" t-as="address_line" t-out="address_line"/>
-            </div>
+                <hr class="azk-sep"/>
+                <table class="azk-order-info w-100">
+                    <tr>
+                        <td class="text-start">
+                            <span name="ticket">Ticket</span> <t t-if="conditions['display_vat']">VAT </t><t t-out="order['pos_reference']"/>
+                        </td>
+                        <td class="text-end" t-out="extra_data['formated_date_order']"/>
+                    </tr>
+                    <tr t-if="extra_data['cashier_name']">
+                        <td class="text-start azk-muted">Cashier</td>
+                        <td class="text-end" t-out="extra_data['cashier_name']"/>
+                    </tr>
+                </table>
+                <div t-if="conditions.get('azk_show_customer') and extra_data.get('azk_customer')" class="azk-customer w-100 text-start">
+                    <div><span class="azk-muted">Customer:</span> <strong t-out="extra_data['azk_customer']['name']"/></div>
+                    <div t-foreach="extra_data['azk_customer']['address_lines']" t-as="address_line" class="azk-muted" t-out="address_line"/>
+                </div>
+                <hr class="azk-sep"/>
+            </t>
+        </xpath>
+        <xpath expr="//div[@name='ticket_reference']/.." position="attributes">
+            <attribute name="t-if">not conditions.get('azk_enhanced')</attribute>
+        </xpath>
+        <xpath expr="//div[@name='cashier_name']" position="attributes">
+            <attribute name="t-if" add="not conditions.get('azk_enhanced')" separator=" and "/>
         </xpath>
         <xpath expr="//div[@name='partner_info']" position="attributes">
             <attribute name="t-if">not conditions.get('azk_enhanced')</attribute>
+        </xpath>
+        <!-- The payment screen preview renders the draft order: no "Pro forma" label there. -->
+        <xpath expr="//div[@name='pro_forma_receipt']" position="attributes">
+            <attribute name="t-if" add="not conditions.get('azk_preview')" separator=" and "/>
         </xpath>
     </template>
 
@@ -31,9 +60,9 @@
                 <thead>
                     <tr>
                         <th class="text-start">Product</th>
-                        <th class="text-end">Qty</th>
-                        <th t-if="not conditions['basic_receipt']" class="text-end">Price</th>
-                        <th t-if="not conditions['basic_receipt']" class="text-end">Total</th>
+                        <th class="text-end azk-num">Qty</th>
+                        <th t-if="not conditions['basic_receipt']" class="text-end azk-num">Price</th>
+                        <th t-if="not conditions['basic_receipt']" class="text-end azk-num">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,18 +71,25 @@
                             <t t-set="azk_table_mode" t-value="True"/>
                             <t t-call="point_of_sale.pos_orderline_receipt_information"/>
                         </td>
-                        <td class="text-end top" t-out="line['qty']"/>
+                        <td class="text-end top azk-num" t-out="line['qty']"/>
                         <t t-if="not conditions['basic_receipt']">
-                            <td class="text-end top font-monospace">
+                            <td class="text-end top azk-num">
                                 <t t-if="not line['combo_parent_id'] and not line['is_service_fee_line']" t-out="line['unit_price']"/>
                             </td>
-                            <td class="text-end top font-monospace">
+                            <td class="text-end top azk-num azk-line-total">
                                 <t t-if="not line['combo_parent_id']" t-out="line['price_subtotal_incl']"/>
                             </td>
                         </t>
                     </tr>
                 </tbody>
             </table>
+        </xpath>
+        <!-- Dashed rules before the totals and before the footer. -->
+        <xpath expr="//div[@name='prices']" position="before">
+            <hr t-if="conditions.get('azk_enhanced')" class="azk-sep"/>
+        </xpath>
+        <xpath expr="//div[@name='before-footer']" position="after">
+            <hr t-if="conditions.get('azk_enhanced')" class="azk-sep"/>
         </xpath>
     </template>
 
@@ -67,11 +103,37 @@
     <!-- Receipt styles: the receipt is rendered in its own document, styled by this template. -->
     <template id="pos_order_receipt_style_enhanced" inherit_id="point_of_sale.pos_order_receipt_style">
         <xpath expr="//style" position="inside">
-            .azk-lines-table { border-collapse: collapse; }
-            .azk-lines-table th { border-bottom: 1px solid #000; padding: 2px 4px; font-weight: bold; }
-            .azk-lines-table td { padding: 3px 4px; border-bottom: 1px dashed #bbb; }
-            .azk-lines-table .azk-combo-child .azk-product-cell { padding-left: 16px; }
-            .azk-company-name p, .azk-company-details p { margin: 0; }
+            /* Same specificity as the native rules (#pos-receipt + !important);
+               sizes in em of the receipt font, so printer sizing still applies. */
+            #pos-receipt .azk-sep { border: 0 !important; border-top: 1px dashed #000 !important; margin: 10px 0 !important; height: 0 !important; }
+            #pos-receipt .azk-muted { color: #555 !important; }
+            #pos-receipt .azk-company { margin-bottom: 4px !important; }
+            #pos-receipt .azk-company-name { font-size: 1.35em !important; font-weight: bold !important; line-height: 1.25 !important; }
+            #pos-receipt .azk-company-details, #pos-receipt .azk-company-vat { font-size: 0.82em !important; line-height: 1.35 !important; }
+            #pos-receipt .azk-company-name p, #pos-receipt .azk-company-details p { margin: 0 !important; }
+            #pos-receipt .azk-order-info { border-collapse: collapse; font-size: 0.82em !important; }
+            #pos-receipt .azk-order-info td { padding: 1px 0 !important; vertical-align: top !important; }
+            #pos-receipt .azk-customer { font-size: 0.82em !important; line-height: 1.35 !important; margin-top: 4px !important; }
+            #pos-receipt .azk-lines-table { border-collapse: collapse; }
+            #pos-receipt .azk-lines-table th { border-bottom: 1px solid #000 !important; padding: 2px 4px !important; font-weight: bold !important; font-size: 0.82em !important; }
+            #pos-receipt .azk-lines-table td { padding: 6px 4px !important; border-bottom: 1px dashed #bbb !important; vertical-align: top !important; }
+            #pos-receipt .azk-lines-table tr:last-child td { border-bottom: 0 !important; }
+            #pos-receipt .azk-lines-table .azk-num { width: 1% !important; white-space: nowrap !important; }
+            #pos-receipt .azk-lines-table .azk-line-total { font-weight: bold !important; }
+            #pos-receipt .azk-lines-table .name { font-size: 1em !important; font-weight: bold !important; line-height: 1.3 !important; }
+            #pos-receipt .azk-lines-table .azk-product-cell .text-small,
+            #pos-receipt .azk-lines-table .azk-product-cell .text-normal,
+            #pos-receipt .azk-lines-table .azk-product-cell div:not(.name) { font-size: 0.78em !important; line-height: 1.35 !important; color: #555 !important; }
+            #pos-receipt .azk-lines-table .azk-combo-child .azk-product-cell { padding-left: 16px !important; }
+            #pos-receipt .azk-lines-table .azk-combo-child .name { font-weight: normal !important; }
+            /* Totals (design A): the dashed rule before them exists only on the
+               customized receipt, so these rules never touch the native one. */
+            #pos-receipt .azk-sep + [name="prices"] .text-large,
+            #pos-receipt .azk-sep + [name="prices"] ~ [name="total_item_count"] { font-size: 0.82em !important; line-height: 1.5 !important; }
+            #pos-receipt .azk-sep + [name="prices"] tr:not(.text-bold) td { color: #555 !important; }
+            #pos-receipt .azk-sep + [name="prices"] tr.text-bold td { color: #000 !important; }
+            #pos-receipt .azk-sep + [name="prices"] td[name="total"],
+            #pos-receipt .azk-sep + [name="prices"] td[name="total"] + td { font-size: 1.5em !important; padding-top: 4px !important; }
         </xpath>
     </template>
 

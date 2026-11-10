@@ -29,6 +29,16 @@
                         </div>
                     </div>
                 </setting>
+                <setting id="azk_payment_receipt_preview"
+                         string="Receipt Preview on Payment Screen"
+                         help="Show the receipt next to the payment, updated live">
+                    <field name="azk_payment_receipt_preview"/>
+                </setting>
+                <setting id="azk_auto_email_receipt"
+                         string="Email Receipt Automatically"
+                         help="After validation, email the receipt to the customer (customer with an email address, outgoing mail server needed). To print without clicking, turn on Automatic Receipt Printing.">
+                    <field name="azk_auto_email_receipt"/>
+                </setting>
             </xpath>
         </field>
     </record>
@@ -61,6 +71,16 @@
                             <field name="pos_show_customer_details"/>
                         </div>
                     </div>
+                </setting>
+                <setting id="azk_pos_payment_receipt_preview"
+                         string="Receipt Preview on Payment Screen"
+                         help="Show the receipt next to the payment, updated live">
+                    <field name="pos_azk_payment_receipt_preview"/>
+                </setting>
+                <setting id="azk_pos_auto_email_receipt"
+                         string="Email Receipt Automatically"
+                         help="After validation, email the receipt to the customer (customer with an email address, outgoing mail server needed). To print without clicking, turn on Automatic Receipt Printing.">
+                    <field name="pos_azk_auto_email_receipt"/>
                 </setting>
             </xpath>
         </field>
