@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================================================================
+         Sales by Salesperson: native POS analysis (one row per line)
+         ================================================================ -->
+
+    <!-- native search view: salesperson filter / group-by, completed and refund filters -->
+    <record id="view_report_pos_order_search_salesperson" model="ir.ui.view">
+        <field name="name">report.pos.order.search.salesperson</field>
+        <field name="model">report.pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_report_pos_order_search"/>
+        <field name="arch" type="xml">
+            <filter name="not_cancelled" position="after">
+                <filter string="Completed Sales" name="completed" domain="[('state', 'in', ['paid', 'done'])]"/>
+                <filter string="Refunds" name="refunds" domain="[('product_qty', '&lt;', 0)]"/>
+                <filter string="Without Salesperson" name="no_salesperson" domain="[('salesperson_id', '=', False)]"/>
+            </filter>
+            <field name="config_id" position="before">
+                <field name="salesperson_id"/>
+                <field name="session_id"/>
+            </field>
+            <filter name="User" position="before">
+                <filter string="Salesperson" name="group_salesperson" context="{'group_by': 'salesperson_id'}"/>
+            </filter>
+            <filter name="order_month" position="after">
+                <filter string="Order Day" name="order_day" context="{'group_by': 'date:day'}"/>
+                <filter string="Order Week" name="order_week" context="{'group_by': 'date:week'}"/>
+                <filter string="Customer" name="group_customer" context="{'group_by': 'partner_id'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <record id="view_report_pos_order_pivot_salesperson" model="ir.ui.view">
+        <field name="name">report.pos.order.pivot.salesperson</field>
+        <field name="model">report.pos.order</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <pivot string="Sales by Salesperson" sample="1">
+                <field name="salesperson_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="order_id" type="measure"/>
+                <field name="product_qty" type="measure"/>
+                <field name="price_subtotal_excl" type="measure"/>
+                <field name="price_total" type="measure"/>
+                <field name="azk_commission" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_report_pos_order_graph_salesperson" model="ir.ui.view">
+        <field name="name">report.pos.order.graph.salesperson</field>
+        <field name="model">report.pos.order</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <graph string="Sales by Salesperson" type="bar" sample="1">
+                <field name="salesperson_id"/>
+                <field name="price_subtotal_excl" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_report_pos_order_list_salesperson" model="ir.ui.view">
+        <field name="name">report.pos.order.list.salesperson</field>
+        <field name="model">report.pos.order</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <list string="Sales by Salesperson" default_order="date desc">
+                <field name="date"/>
+                <field name="order_id"/>
+                <field name="config_id" optional="show"/>
+                <field name="session_id" optional="hide"/>
+                <field name="partner_id" optional="hide"/>
+                <field name="salesperson_id"/>
+                <field name="product_id"/>
+                <field name="product_categ_id" optional="hide"/>
+                <field name="product_qty" sum="Total"/>
+                <field name="total_discount" optional="hide" sum="Total"/>
+                <field name="price_subtotal_excl" sum="Total"/>
+                <field name="price_total" optional="show" sum="Total"/>
+                <field name="margin" optional="hide" sum="Total"/>
+                <field name="azk_commission" sum="Total"/>
+                <field name="state" optional="hide"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_azk_sales_by_salesperson" model="ir.actions.act_window">
+        <field name="name">Sales by Salesperson</field>
+        <field name="res_model">report.pos.order</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_report_pos_order_pivot_salesperson')}),
+            (0, 0, {'view_mode': 'graph', 'view_id': ref('view_report_pos_order_graph_salesperson')}),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_report_pos_order_list_salesperson')})]"/>
+        <field name="context">{'search_default_completed': 1, 'search_default_filter_date': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_empty_folder">No sales yet</p>
+            <p>Every product sold in the Point of Sale, credited to the salesperson of its line.</p>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Salesperson Performance: one row per (order, salesperson)
+         ================================================================ -->
+
+    <record id="view_azk_salesperson_performance_search" model="ir.ui.view">
+        <field name="name">azk.pos.salesperson.report.search</field>
+        <field name="model">azk.pos.salesperson.report</field>
+        <field name="arch" type="xml">
+            <search string="Salesperson Performance">
+                <field name="salesperson_id"/>
+                <field name="config_id"/>
+                <field name="session_id"/>
+                <field name="partner_id"/>
+                <filter string="Completed Sales" name="completed" domain="[('state', 'in', ['paid', 'done'])]"/>
+                <filter string="Without Salesperson" name="no_salesperson" domain="[('salesperson_id', '=', False)]"/>
+                <separator/>
+                <filter name="filter_date" date="date"/>
+                <group>
+                    <filter string="Salesperson" name="group_salesperson" context="{'group_by': 'salesperson_id'}"/>
+                    <filter string="Point of Sale" name="group_pos" context="{'group_by': 'config_id'}"/>
+                    <filter string="Customer" name="group_customer" context="{'group_by': 'partner_id'}"/>
+                    <separator/>
+                    <filter string="Order Day" name="group_day" context="{'group_by': 'date:day'}"/>
+                    <filter string="Order Week" name="group_week" context="{'group_by': 'date:week'}"/>
+                    <filter string="Order Month" name="group_month" context="{'group_by': 'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_azk_salesperson_performance_pivot" model="ir.ui.view">
+        <field name="name">azk.pos.salesperson.report.pivot</field>
+        <field name="model">azk.pos.salesperson.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Salesperson Performance" sample="1">
+                <field name="salesperson_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="order_count" type="measure"/>
+                <field name="amount_untaxed" type="measure"/>
+                <field name="average_order_value" type="measure"/>
+                <field name="product_qty" type="measure"/>
+                <field name="commission" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_azk_salesperson_performance_graph" model="ir.ui.view">
+        <field name="name">azk.pos.salesperson.report.graph</field>
+        <field name="model">azk.pos.salesperson.report</field>
+        <field name="arch" type="xml">
+            <graph string="Salesperson Performance" type="bar" sample="1">
+                <field name="salesperson_id"/>
+                <field name="amount_untaxed" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_azk_salesperson_performance_list" model="ir.ui.view">
+        <field name="name">azk.pos.salesperson.report.list</field>
+        <field name="model">azk.pos.salesperson.report</field>
+        <field name="arch" type="xml">
+            <list string="Salesperson Performance">
+                <field name="date"/>
+                <field name="order_id"/>
+                <field name="salesperson_id"/>
+                <field name="config_id" optional="show"/>
+                <field name="partner_id" optional="hide"/>
+                <field name="line_count" optional="hide" sum="Total"/>
+                <field name="product_qty" sum="Total"/>
+                <field name="amount_untaxed" sum="Total"/>
+                <field name="amount_total" optional="show" sum="Total"/>
+                <field name="commission" sum="Total"/>
+                <field name="state" optional="hide"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_azk_salesperson_performance" model="ir.actions.act_window">
+        <field name="name">Salesperson Performance</field>
+        <field name="res_model">azk.pos.salesperson.report</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_completed': 1, 'search_default_filter_date': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_empty_folder">No sales yet</p>
+            <p>Orders, sales, average order value and commission of each salesperson.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_azk_sales_by_salesperson"
+              name="Sales by Salesperson"
+              parent="point_of_sale.menu_point_rep"
+              action="action_azk_sales_by_salesperson"
+              sequence="10"
+              groups="point_of_sale.group_pos_manager"/>
+    <menuitem id="menu_azk_salesperson_performance"
+              name="Salesperson Performance"
+              parent="point_of_sale.menu_point_rep"
+              action="action_azk_salesperson_performance"
+              sequence="11"
+              groups="point_of_sale.group_pos_manager"/>
+</odoo>
