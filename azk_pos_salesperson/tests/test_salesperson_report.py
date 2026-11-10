@@ -138,3 +138,38 @@ class TestSalespersonReport(AzkPosSalespersonCommon):
         domain = [('order_id', '=', order.id)]
         self.assertTrue(self.env[self.PERF].with_user(insider).search(domain))
         self.assertFalse(self.env[self.PERF].with_user(outsider).search(domain))
+
+    # ------------------------------------------------------------------
+    # Task 4: menus, actions, views
+    # ------------------------------------------------------------------
+
+    def test_report_actions_and_menus(self):
+        reporting = self.env.ref('point_of_sale.menu_point_rep')
+        manager = self.env.ref('point_of_sale.group_pos_manager')
+        for xmlid, model in (
+            ('azk_pos_salesperson.action_azk_sales_by_salesperson', 'report.pos.order'),
+            ('azk_pos_salesperson.action_azk_salesperson_performance', 'azk.pos.salesperson.report'),
+        ):
+            with self.subTest(action=xmlid):
+                action = self.env.ref(xmlid)
+                self.assertEqual(action.res_model, model)
+                self.assertEqual(action.view_mode.split(',')[0], 'pivot')
+                self.assertIn('search_default_completed', action.context)
+                menu = self.env['ir.ui.menu'].search([('action', '=', f'ir.actions.act_window,{action.id}')])
+                self.assertEqual(menu.parent_id, reporting)
+                self.assertEqual(menu.group_ids, manager)
+                # every view of the action renders (pivot, graph, list, search)
+                for view_type in ('pivot', 'graph', 'list', 'search'):
+                    self.env[model].get_view(view_type=view_type)
+
+    def test_native_analysis_groups_by_salesperson(self):
+        arch = self.env['report.pos.order'].get_view(
+            self.env.ref('point_of_sale.view_report_pos_order_search').id, 'search')['arch']
+        self.assertIn("'group_by': 'salesperson_id'", arch.replace('"', "'"))
+
+    def test_completed_filter_excludes_draft_and_cancel(self):
+        for model in ('report.pos.order', 'azk.pos.salesperson.report'):
+            arch = self.env[model].get_view(view_type='search')['arch']
+            with self.subTest(model=model):
+                self.assertIn('name="completed"', arch)
+                self.assertIn("('state', 'in', ['paid', 'done'])", arch)
