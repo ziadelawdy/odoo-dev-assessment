@@ -1,9 +1,30 @@
 import { patch } from "@web/core/utils/patch";
+import { _t } from "@web/core/l10n/translation";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
+import { selectSalesperson } from "@azk_pos_salesperson/app/utils/salesperson_popup";
 
 patch(PosStore.prototype, {
+    /** Ask only for the first product of an order that has no salesperson yet. */
+    azkShouldAskSalesperson(vals, order) {
+        return Boolean(
+            this.config.active_salesperson_feature &&
+                order &&
+                !order.salesperson_id &&
+                !order.lines.length &&
+                !("salesperson_id" in vals) &&
+                this.models["pos.sale.person"].getAll().length
+        );
+    },
     /** New lines are credited to the order salesperson, if one was set. */
     async addLineToOrder(vals, order, opts = {}, configure = true) {
+        if (this.azkShouldAskSalesperson(vals, order)) {
+            // first product of the order: the answer becomes the order salesperson;
+            // "No salesperson" or closing the popup adds the product without one
+            const chosen = await selectSalesperson(this, this.dialog, null, _t("Who is the salesperson for this order?"));
+            if (chosen) {
+                order.setSalespersonOnAllLines(chosen);
+            }
+        }
         const person = this.config.active_salesperson_feature ? order?.salesperson_id : false;
         const inherit = person && !("salesperson_id" in vals);
         if (inherit) {

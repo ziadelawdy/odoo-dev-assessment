@@ -26,6 +26,12 @@ const assignLine = (product, person) => [
     },
 ];
 
+const choose = (person) => ({
+    content: `choose ${person} in the salesperson popup`,
+    trigger: `.modal .selection-item:contains("${person}")`,
+    run: "click",
+});
+
 const assignOrder = (person) => [
     {
         content: "open order salesperson popup",
@@ -63,6 +69,8 @@ registry.category("web_tour.tours").add("AzkSalespersonLineTour", {
         [
             open(),
             ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             assignLine("Whiteboard Pen", "Salesperson A"),
             lineShows("Whiteboard Pen", "Salesperson A"),
             ProductScreen.clickDisplayedProduct("Letter Tray"),
@@ -79,6 +87,8 @@ registry.category("web_tour.tours").add("AzkSalespersonGlobalTour", {
         [
             open(),
             ProductScreen.clickDisplayedProduct("Desk Organizer"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             assignLine("Desk Organizer", "Salesperson A"),
             ProductScreen.clickDisplayedProduct("Wall Shelf Unit"),
             assignLine("Wall Shelf Unit", "Salesperson B"),
@@ -97,6 +107,8 @@ registry.category("web_tour.tours").add("AzkSalespersonNoneTour", {
         [
             open(),
             ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             ProductScreen.clickDisplayedProduct("Letter Tray"),
             lineShowsNothing("Whiteboard Pen"),
             lineShowsNothing("Letter Tray"),
@@ -245,11 +257,64 @@ registry.category("web_tour.tours").add("AzkSalespersonRefundTour", {
         ].flat(Infinity),
 });
 
+// ---------------------------------------------------------------------------
+// First product prompt + visible line button (user feedback)
+// ---------------------------------------------------------------------------
+
+registry.category("web_tour.tours").add("AzkSalespersonFirstProductTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            choose("Salesperson A"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            {
+                content: "the chosen person becomes the order salesperson",
+                trigger: '.azk-assign-order-salesperson:contains("Salesperson A")',
+            },
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            lineShows("Letter Tray", "Salesperson A"),
+            {
+                content: "no prompt for the following products",
+                trigger: negate(".modal .selection-item"),
+            },
+            // one line can still be changed on its own
+            assignLine("Letter Tray", "Salesperson B"),
+            lineShows("Letter Tray", "Salesperson B"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonFirstProductSkipTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            choose("No salesperson"),
+            {
+                content: "an unassigned line shows a visible button to add one",
+                trigger: `${line("Whiteboard Pen")} .azk-salesperson-btn:contains("Add salesperson")`,
+            },
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            {
+                content: "skipping once means no prompt for the next products",
+                trigger: negate(".modal .selection-item"),
+            },
+            lineShowsNothing("Letter Tray"),
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
 registry.category("web_tour.tours").add("AzkSalespersonSmallScreenTour", {
     steps: () =>
         [
             open(),
             ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            // first product: the salesperson prompt opens, skip it
+            choose("No salesperson"),
             ProductScreen.clickReview(),
             ProductScreen.clickControlButtonMore(),
             assignOrder("Salesperson A"),

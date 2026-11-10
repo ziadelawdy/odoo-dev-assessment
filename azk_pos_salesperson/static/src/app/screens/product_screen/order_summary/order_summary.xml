@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
-    <!-- Per-line salesperson icon: rendered in the Orderline default slot,
-         so it only appears on the product screen. -->
+    <!-- Per-line salesperson button: rendered in the Orderline default slot,
+         so it only appears on the product screen. The POS ships the "oi"
+         icon font only (no Font Awesome). -->
     <t t-name="azk_pos_salesperson.OrderSummary" t-inherit="point_of_sale.OrderSummary" t-inherit-mode="extension">
         <xpath expr="//Orderline" position="inside">
-            <li t-if="this.pos.config.active_salesperson_feature" class="azk-salesperson-line d-flex align-items-center gap-2">
-                <button class="azk-salesperson-btn btn btn-link p-0 text-decoration-none"
-                        title="Assign salesperson" aria-label="Assign salesperson"
+            <li t-if="this.pos.config.active_salesperson_feature" class="azk-salesperson-line mt-1">
+                <button class="azk-salesperson-btn btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1 py-0 px-2"
+                        title="Change the salesperson of this line" aria-label="Change the salesperson of this line"
                         t-on-pointerdown.stop="() => {}"
                         t-on-pointerup.stop="() => {}"
                         t-on-click.stop="() => this.azkAssignLineSalesperson(line)">
-                    <i class="fa fa-user-plus" aria-hidden="true"/>
+                    <i class="oi oi-filled" t-att-data-icon="line.salesperson_id ? 'person' : 'person_add'" aria-hidden="true"/>
+                    <span t-if="line.salesperson_id" class="azk-salesperson-name" t-out="line.salesperson_id.name"/>
+                    <span t-else="" class="azk-salesperson-empty">Add salesperson</span>
                 </button>
-                <span t-if="line.salesperson_id" class="azk-salesperson-name" t-out="line.salesperson_id.name"/>
             </li>
         </xpath>
     </t>

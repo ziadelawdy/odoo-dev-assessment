@@ -222,7 +222,12 @@ own. Installed together, they compose with no bridge module (see *Conflicts* bel
 - **Offline:** the allowed salespersons are loaded with the POS data, and assignments are stored
   on the order and synced with it. Nothing calls the server.
 - **In the POS (feature on):**
-  - a person icon on every order line assigns a salesperson to **that line only**;
+  - adding the **first product** of an order opens the salesperson popup. The person chosen
+    becomes the order salesperson, so every product added after it gets the same person.
+    *No salesperson* (or closing the popup) adds the product unassigned, and the popup is not
+    shown again for that order;
+  - a salesperson button under every order line (the name, or *Add salesperson*) changes
+    **that line only**;
   - **Assign Salesperson to Order** assigns a salesperson to **every line**, and also becomes the
     order salesperson. **Lines added afterwards inherit it.** A line changed individually keeps
     its value.
@@ -279,10 +284,11 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 ### Manual test steps (assessment §4.2)
 
 1. **Visibility.** Open a session on each POS and sell something.
-   - The line icon and the *Assign Salesperson to Order* button appear only when Salesperson
-     Assignment is on.
+   - The first-product popup, the line button and the *Assign Salesperson to Order* button
+     appear only when Salesperson Assignment is on.
    - The receipt shows the branded table layout only when Customized Receipt is on.
-2. **Per line.** Add *X* and *Y*. Click the person icon on X and pick A; on Y pick B. Pay.
+2. **Per line.** Add *X* (pick *No salesperson* in the first-product popup) and *Y*. Click the
+   salesperson button under X and pick A; under Y pick B. Pay.
    - The receipt shows A under X and B under Y.
    - *Point of Sale › Orders › Order lines* shows the same.
 3. **Global overwrites.** Assign A and B per line, then *Assign Salesperson to Order* → C. Both
@@ -294,14 +300,14 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 
 ### Automated tests
 
-45 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
+47 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
 The POS tours drive Chrome through real sales.
 
 | Module / file | Covers |
 |---|---|
 | `azk_pos_salesperson/tests/test_salesperson_backend.py` | Required name. Loads only the allowed salespersons, and none when the feature is off. Order sync stores the line and order salesperson. Access rights (POS user read, manager write). Backend views. |
 | `azk_pos_salesperson/tests/test_salesperson_receipt.py` | Receipt data and server-rendered receipt: name under the product; hidden when the feature is off or the line is unassigned. |
-| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
+| `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. First-product popup (choose or skip). New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. Settings write-through. No name clash with native fields. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout, native when off, customer hidden, logo fallback, basic receipt table, no duplicated company info or unit price. |
 | `azk_pos_salesperson/tests/test_review_fixes.py` | Regressions from the independent review. Editing a combo keeps its children credited. POS refunds keep the salesperson. The order button is available on small screens (phone/tablet viewport tour). Multi-company checks. Employee records are never loaded into the POS. |
