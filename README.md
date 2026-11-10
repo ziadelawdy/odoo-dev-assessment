@@ -326,7 +326,7 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 
 ### Automated tests
 
-60 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
+61 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
 The POS tours drive Chrome through real sales.
 
 | Module / file | Covers |
