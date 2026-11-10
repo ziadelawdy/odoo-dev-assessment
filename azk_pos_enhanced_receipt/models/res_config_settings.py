@@ -10,3 +10,4 @@ class ResConfigSettings(models.TransientModel):
     pos_company_details = fields.Html(related='pos_config_id.company_details', readonly=False)
     pos_show_customer_details = fields.Boolean(related='pos_config_id.show_customer_details', readonly=False)
     pos_azk_payment_receipt_preview = fields.Boolean(related='pos_config_id.azk_payment_receipt_preview', readonly=False)
+    pos_azk_auto_email_receipt = fields.Boolean(related='pos_config_id.azk_auto_email_receipt', readonly=False)

@@ -3,6 +3,7 @@ import * as Dialog from "@point_of_sale/../tests/generic_helpers/dialog_util";
 import * as ProductScreen from "@point_of_sale/../tests/pos/tours/utils/product_screen_util";
 import * as PaymentScreen from "@point_of_sale/../tests/pos/tours/utils/payment_screen_util";
 import * as FeedbackScreen from "@point_of_sale/../tests/pos/tours/utils/feedback_screen_util";
+import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
 import { registry } from "@web/core/registry";
 
 /** Checkout flow: live receipt preview on the payment screen, automatic email. */
@@ -94,6 +95,59 @@ registry.category("web_tour.tours").add("AzkPaymentPreviewOffTour", {
             PaymentScreen.clickPaymentMethod("Bank"),
             PaymentScreen.clickValidate(),
             FeedbackScreen.isShown(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+// ---------------------------------------------------------------------------
+// Automatic email after validation
+// ---------------------------------------------------------------------------
+
+const sellToCustomer = () => [
+    ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+    pickCustomer("APartner Full"),
+    ProductScreen.clickPayButton(),
+    PaymentScreen.clickPaymentMethod("Bank"),
+    PaymentScreen.clickValidate(),
+    FeedbackScreen.isShown(),
+];
+
+registry.category("web_tour.tours").add("AzkAutoEmailTour", {
+    steps: () =>
+        [
+            open(),
+            sellToCustomer(),
+            {
+                content: "the cashier is told the receipt was emailed",
+                trigger: '.o_notification:contains("apartner@example.com")',
+            },
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkAutoEmailOffTour", {
+    steps: () => [open(), sellToCustomer(), Chrome.endTour()].flat(Infinity),
+});
+
+registry.category("web_tour.tours").add("AzkAutoEmailUnsyncedTour", {
+    steps: () =>
+        [
+            open(),
+            {
+                content: "an order not synced to the server is never emailed",
+                trigger: ".pos .product-screen",
+                run: async () => {
+                    const order = posmodel.getOrder();
+                    order.setPartner(posmodel.models["res.partner"].find((p) => p.name === "APartner Full"));
+                    if (order.isSynced) {
+                        throw new Error("the order should not be synced yet");
+                    }
+                    const validation = new OrderPaymentValidation({ pos: posmodel, orderUuid: order.uuid });
+                    if (validation.azkAutoEmailReceipt() !== false) {
+                        throw new Error("an unsynced order must not be emailed");
+                    }
+                },
+            },
             Chrome.endTour(),
         ].flat(Infinity),
 });

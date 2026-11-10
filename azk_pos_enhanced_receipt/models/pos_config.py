@@ -25,3 +25,8 @@ class PosConfig(models.Model):
         string='Receipt Preview on Payment Screen', default=True,
         help='Show the receipt, updated live, next to the payment on large screens.',
     )
+    azk_auto_email_receipt = fields.Boolean(
+        string='Email Receipt Automatically',
+        help='After validation, email the receipt to the customer when the customer has an email address. '
+             'Needs an outgoing mail server.',
+    )
