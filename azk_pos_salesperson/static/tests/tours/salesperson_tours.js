@@ -287,6 +287,39 @@ registry.category("web_tour.tours").add("AzkSalespersonFirstProductTour", {
         ].flat(Infinity),
 });
 
+const dismiss = () => ({
+    content: "close the salesperson popup without choosing",
+    trigger: '.modal:has(.selection-item) [aria-label="Close"]',
+    run: "click",
+});
+
+registry.category("web_tour.tours").add("AzkSalespersonFirstProductDismissTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            dismiss(),
+            {
+                content: "the line is unassigned",
+                trigger: `${line("Whiteboard Pen")} .azk-salesperson-btn:contains("Add salesperson")`,
+            },
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            // closing the popup is not an answer: ask again
+            dismiss(),
+            ProductScreen.clickDisplayedProduct("Desk Pad"),
+            choose("Salesperson A"),
+            lineShows("Whiteboard Pen", "Salesperson A"),
+            lineShows("Letter Tray", "Salesperson A"),
+            lineShows("Desk Pad", "Salesperson A"),
+            {
+                content: "the choice becomes the order salesperson",
+                trigger: '.azk-assign-order-salesperson:contains("Salesperson A")',
+            },
+            pay(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
 registry.category("web_tour.tours").add("AzkSalespersonFirstProductSkipTour", {
     steps: () =>
         [

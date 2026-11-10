@@ -88,6 +88,13 @@ class TestSalespersonUi(TestPointOfSaleHttpCommon):
         self.assertEqual(lines['Whiteboard Pen'], self.sp_a)
         self.assertEqual(lines['Letter Tray'], self.sp_b)
 
+    def test_first_product_dismiss_asks_again(self):
+        self.start_pos_tour('AzkSalespersonFirstProductDismissTour')
+        order = self._last_order()
+        self.assertEqual(len(order.lines), 3)
+        self.assertEqual(order.lines.salesperson_id, self.sp_a)
+        self.assertEqual(order.salesperson_id, self.sp_a)
+
     def test_first_product_prompt_can_be_skipped(self):
         self.start_pos_tour('AzkSalespersonFirstProductSkipTour')
         order = self._last_order()

@@ -4,13 +4,17 @@ import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { selectSalesperson } from "@azk_pos_salesperson/app/utils/salesperson_popup";
 
 patch(PosStore.prototype, {
-    /** Ask only for the first product of an order that has no salesperson yet. */
+    /**
+     * Ask when a product is added to an order that has no salesperson and
+     * whose cashier has not answered the question yet (closing the popup is
+     * not an answer; "No salesperson" is).
+     */
     azkShouldAskSalesperson(vals, order) {
         return Boolean(
             this.config.active_salesperson_feature &&
                 order &&
                 !order.salesperson_id &&
-                !order.lines.length &&
+                !order.uiState?.azkSalespersonAnswered &&
                 !("salesperson_id" in vals) &&
                 this.models["pos.sale.person"].getAll().length
         );
@@ -18,9 +22,13 @@ patch(PosStore.prototype, {
     /** New lines are credited to the order salesperson, if one was set. */
     async addLineToOrder(vals, order, opts = {}, configure = true) {
         if (this.azkShouldAskSalesperson(vals, order)) {
-            // first product of the order: the answer becomes the order salesperson;
-            // "No salesperson" or closing the popup adds the product without one
+            // the answer becomes the order salesperson (all lines so far);
+            // "No salesperson" (null) stops the question for this order,
+            // closing the popup (undefined) asks again with the next product
             const chosen = await selectSalesperson(this, this.dialog, null, _t("Who is the salesperson for this order?"));
+            if (chosen !== undefined) {
+                order.uiState.azkSalespersonAnswered = true;
+            }
             if (chosen) {
                 order.setSalespersonOnAllLines(chosen);
             }
