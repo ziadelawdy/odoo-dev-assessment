@@ -26,12 +26,17 @@ class SalespersonPerformanceReport(models.Model):
     state = fields.Selection(
         [('draft', 'New'), ('cancel', 'Cancelled'), ('paid', 'Paid'), ('done', 'Posted')],
         string='Status', readonly=True)
-    order_count = fields.Integer(string='Orders', readonly=True)
+    order_count = fields.Integer(
+        string='Orders', readonly=True,
+        help='Orders the salesperson took part in. Refund orders are not counted. An order shared by two '
+             'salespersons counts once for each of them, so totals across salespersons can exceed the real number of orders.')
     line_count = fields.Integer(string='Lines', readonly=True)
     product_qty = fields.Float(string='Items', readonly=True)
     amount_untaxed = fields.Monetary(string='Sales w/o Tax', readonly=True)
     amount_total = fields.Monetary(string='Sales incl. Tax', readonly=True)
-    average_order_value = fields.Monetary(string='Average Order Value', readonly=True, aggregator='avg')
+    average_order_value = fields.Monetary(
+        string='Average Order Value', readonly=True, aggregator='avg',
+        help="The salesperson's share of each sale order (refund orders are left out of the average).")
     commission = fields.Monetary(string='Commission', readonly=True)
 
     def _query(self):
@@ -50,11 +55,11 @@ class SalespersonPerformanceReport(models.Model):
                 s.company_id AS company_id,
                 co.currency_id AS currency_id,
                 s.state AS state,
-                1 AS order_count,
+                CASE WHEN s.is_refund THEN 0 ELSE 1 END AS order_count,
                 COUNT(l.id) AS line_count,
                 SUM(l.qty) AS product_qty,
                 SUM(%(untaxed)s) AS amount_untaxed,
-                SUM(%(untaxed)s) AS average_order_value,
+                CASE WHEN s.is_refund THEN NULL ELSE SUM(%(untaxed)s) END AS average_order_value,
                 SUM(ROUND(
                     (SIGN(l.qty) * SIGN(l.price_unit) * ABS(l.price_subtotal_incl))
                     / COALESCE(NULLIF(s.currency_rate, 0), 1.0), cu.decimal_places)) AS amount_total,

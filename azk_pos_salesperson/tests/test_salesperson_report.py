@@ -158,9 +158,16 @@ class TestSalespersonReport(AzkPosSalespersonCommon):
                 menu = self.env['ir.ui.menu'].search([('action', '=', f'ir.actions.act_window,{action.id}')])
                 self.assertEqual(menu.parent_id, reporting)
                 self.assertEqual(menu.group_ids, manager)
-                # every view of the action renders (pivot, graph, list, search)
+                # every view of the action renders: its own views, then the default ones
+                for action_view in action.view_ids:
+                    self.env[model].get_view(action_view.view_id.id, action_view.view_mode)
                 for view_type in ('pivot', 'graph', 'list', 'search'):
                     self.env[model].get_view(view_type=view_type)
+        self.assertEqual(
+            self.env.ref('azk_pos_salesperson.action_azk_sales_by_salesperson').view_ids.view_id,
+            self.env.ref('azk_pos_salesperson.view_report_pos_order_pivot_salesperson')
+            | self.env.ref('azk_pos_salesperson.view_report_pos_order_graph_salesperson')
+            | self.env.ref('azk_pos_salesperson.view_report_pos_order_list_salesperson'))
 
     def test_native_analysis_groups_by_salesperson(self):
         arch = self.env['report.pos.order'].get_view(
@@ -173,3 +180,51 @@ class TestSalespersonReport(AzkPosSalespersonCommon):
             with self.subTest(model=model):
                 self.assertIn('name="completed"', arch)
                 self.assertIn("('state', 'in', ['paid', 'done'])", arch)
+
+    # ------------------------------------------------------------------
+    # Review fixes
+    # ------------------------------------------------------------------
+
+    def test_resync_keeps_frozen_rate(self):
+        # the POS re-sends the whole line (same salesperson) when an order is synced again
+        self.sp_a.commission_rate = 10
+        self.open_new_session()
+        order = self._sync_order([(self.product_x, 1, self.sp_a)])
+        self.sp_a.commission_rate = 20
+        order.lines.write({'salesperson_id': self.sp_a.id, 'qty': 2})
+        self.assertEqual(order.lines.azk_commission_rate, 10)
+        # a real change of salesperson takes the new salesperson's rate
+        self.sp_b.commission_rate = 7
+        order.lines.write({'salesperson_id': self.sp_b.id})
+        self.assertEqual(order.lines.azk_commission_rate, 7)
+
+    def test_refund_uses_rate_of_refunded_line(self):
+        self.sp_a.commission_rate = 10
+        self.open_new_session()
+        order = self._sync_order([(self.product_x, 1, self.sp_a)])
+        self.sp_a.commission_rate = 20
+        refund = order._refund()
+        self.assertEqual(refund.lines.salesperson_id, self.sp_a)
+        self.assertEqual(refund.lines.azk_commission_rate, 10)
+        groups = self._report_groups('report.pos.order', order | refund, ['azk_commission:sum'])
+        self.assertAlmostEqual(groups[self.sp_a][0], 0, msg='a fully refunded sale earns no commission')
+
+    def test_performance_refund_order_not_counted(self):
+        self.open_new_session()
+        sales = (
+            self._sync_order([(self.product_y, 1, self.sp_a)])
+            | self._sync_order([(self.product_y, 1, self.sp_a)])
+        )
+        refund = sales[0]._refund()
+        groups = self._report_groups(self.PERF, sales | refund, [
+            'order_count:sum', 'amount_untaxed:sum', 'average_order_value:avg'])
+        orders_a, sales_a, average_a = groups[self.sp_a]
+        self.assertEqual(orders_a, 2, 'a refund is not an extra order')
+        self.assertAlmostEqual(sales_a, 20, msg='the refund is netted from the sales')
+        self.assertAlmostEqual(average_a, 20, msg='the refund does not drag the average order value down')
+
+    def test_report_order_count_distinct(self):
+        self.open_new_session()
+        order = self._sync_order([(self.product_x, 1, self.sp_a), (self.product_y, 1, self.sp_a)])
+        groups = self._report_groups('report.pos.order', order, ['order_id:count_distinct'])
+        self.assertEqual(groups[self.sp_a][0], 1)

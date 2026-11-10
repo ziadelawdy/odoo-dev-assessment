@@ -24,6 +24,7 @@
             </filter>
             <filter name="order_month" position="after">
                 <filter string="Order Day" name="order_day" context="{'group_by': 'date:day'}"/>
+                <filter string="Order Week" name="order_week" context="{'group_by': 'date:week'}"/>
                 <filter string="Customer" name="group_customer" context="{'group_by': 'partner_id'}"/>
             </filter>
         </field>

@@ -33,14 +33,19 @@ line, but no report shows it.
   employee: `_select` is extended with `l.salesperson_id`. Every amount comes from the native
   expressions, so the report matches the native POS analysis exactly.
 - **Commission rate is frozen at sale time.** The rate is copied onto the order line
-  (`azk_commission_rate`, stored compute depending only on `salesperson_id`). Changing a
-  salesperson's rate later does not rewrite past commissions.
+  (`azk_commission_rate`) when the line is created, and changes only when the line's salesperson
+  really changes. It is not a compute: the POS re-sends whole lines when an order is synced again,
+  and a compute on `salesperson_id` would re-read today's rate (found in review). A refund line
+  keeps the rate of the line it refunds, so a fully refunded sale nets to zero commission.
 - **Commission basis** is the untaxed line amount (the native `price_subtotal_excl` expression,
   currency-converted like the rest of the report).
 - **Average order value** is the salesperson's own share of each order: an order with lines from A
   and B counts as one order for A (A's lines only) and one for B. The pivot cannot divide two sums,
   so a second SQL view at (order, salesperson) grain carries the per-order amount twice: summed
   (Sales) and averaged (Average order value).
+- **Refund orders** are netted from sales and commission, but they are not counted as orders and
+  are left out of the average order value. An order shared by two salespersons counts once for
+  each of them (documented on the *Orders* measure).
 - **Unassigned sales** appear as their own group (salesperson empty), so missed assignments are
   visible.
 - **Completed sales** = state `paid` or `done`. It is a default filter, not a hard domain, so drafts
