@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="azk_pos_enhanced_receipt.ReceiptPreview">
+        <div class="azk-receipt-preview d-flex flex-column h-100">
+            <iframe t-ref="this.frame" class="azk-receipt-preview-frame" title="Receipt preview"/>
+        </div>
+    </t>
+</templates>

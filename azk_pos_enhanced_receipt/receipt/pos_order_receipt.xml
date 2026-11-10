@@ -19,6 +19,10 @@
         <xpath expr="//div[@name='partner_info']" position="attributes">
             <attribute name="t-if">not conditions.get('azk_enhanced')</attribute>
         </xpath>
+        <!-- The payment screen preview renders the draft order: no "Pro forma" label there. -->
+        <xpath expr="//div[@name='pro_forma_receipt']" position="attributes">
+            <attribute name="t-if" add="not conditions.get('azk_preview')" separator=" and "/>
+        </xpath>
     </template>
 
     <!-- Lines: one table (Product | Qty | Price | Total) instead of the per-line tables. -->

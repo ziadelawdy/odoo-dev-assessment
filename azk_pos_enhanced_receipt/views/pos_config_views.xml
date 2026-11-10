@@ -29,6 +29,11 @@
                         </div>
                     </div>
                 </setting>
+                <setting id="azk_payment_receipt_preview"
+                         string="Receipt Preview on Payment Screen"
+                         help="Show the receipt next to the payment, updated live">
+                    <field name="azk_payment_receipt_preview"/>
+                </setting>
             </xpath>
         </field>
     </record>
@@ -61,6 +66,11 @@
                             <field name="pos_show_customer_details"/>
                         </div>
                     </div>
+                </setting>
+                <setting id="azk_pos_payment_receipt_preview"
+                         string="Receipt Preview on Payment Screen"
+                         help="Show the receipt next to the payment, updated live">
+                    <field name="pos_azk_payment_receipt_preview"/>
                 </setting>
             </xpath>
         </field>

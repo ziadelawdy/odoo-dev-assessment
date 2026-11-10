@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <!-- Large screens only: a third column with the live receipt. -->
+    <t t-name="azk_pos_enhanced_receipt.PaymentScreen" t-inherit="point_of_sale.PaymentScreen" t-inherit-mode="extension">
+        <xpath expr="//div[contains(@class, 'center-content')]" position="after">
+            <div t-if="this.pos.config.azk_payment_receipt_preview" class="azk-receipt-preview-col py-2 pe-2">
+                <AzkReceiptPreview order="this.currentOrder"/>
+            </div>
+        </xpath>
+    </t>
+</templates>

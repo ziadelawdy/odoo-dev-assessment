@@ -21,3 +21,7 @@ class PosConfig(models.Model):
         string='Show Customer Details',
         help="Print the customer's name and address on the customized receipt.",
     )
+    azk_payment_receipt_preview = fields.Boolean(
+        string='Receipt Preview on Payment Screen', default=True,
+        help='Show the receipt, updated live, next to the payment on large screens.',
+    )
