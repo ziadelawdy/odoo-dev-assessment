@@ -52,7 +52,20 @@ export class AzkReceiptPreview extends Component {
         // scroll position (the totals are at the bottom of a long receipt)
         const scrollTop = iframe.contentDocument?.scrollingElement?.scrollTop || 0;
         iframe.onload = () => {
-            const scroller = iframe.contentDocument?.scrollingElement;
+            const doc = iframe.contentDocument;
+            if (!doc?.documentElement) {
+                return;
+            }
+            // the receipt has a fixed paper width (512px): shrink it to the column
+            const root = doc.documentElement;
+            root.style.zoom = "";
+            const width = root.scrollWidth;
+            // clientWidth of the document excludes the vertical scrollbar
+            const available = root.clientWidth;
+            if (width > available) {
+                root.style.zoom = String(available / width);
+            }
+            const scroller = doc.scrollingElement;
             if (scroller && scrollTop) {
                 scroller.scrollTop = scrollTop;
             }

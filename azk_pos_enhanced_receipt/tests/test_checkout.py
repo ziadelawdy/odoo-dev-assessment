@@ -85,3 +85,13 @@ class TestCheckoutUi(TestPointOfSaleHttpCommon):
     def test_auto_email_skips_unsynced_order(self):
         self.main_pos_config.azk_auto_email_receipt = True
         self._run_email_tour('AzkAutoEmailUnsyncedTour', 'apartner@example.com')
+
+
+@tagged('post_install', '-at_install')
+class TestCheckoutTabletUi(TestPointOfSaleHttpCommon):
+    """Browser check found the preview overflowing a 1024px screen."""
+    browser_size = '1024x768'
+
+    def test_payment_preview_fits_tablet_screen(self):
+        self.main_pos_config.azk_payment_receipt_preview = True
+        self.start_pos_tour('AzkPaymentPreviewFitsScreenTour')

@@ -56,8 +56,55 @@ registry.category("web_tour.tours").add("AzkPaymentPreviewTour", {
                 absentTexts: ["Pro forma"],
                 present: [".azk-lines-table"],
             }),
+            {
+                content: "browser check: the whole receipt fits the preview column (no cut-off prices)",
+                trigger: ".payment-screen .azk-receipt-preview iframe",
+                run: async () => {
+                    for (let attempt = 0; attempt < 30; attempt++) {
+                        const scroller = previewDoc()?.scrollingElement;
+                        if (scroller && scroller.scrollWidth <= scroller.clientWidth + 1) {
+                            return;
+                        }
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                    }
+                    const scroller = previewDoc().scrollingElement;
+                    throw new Error(`receipt wider than the preview: ${scroller.scrollWidth} > ${scroller.clientWidth}`);
+                },
+            },
+            {
+                content: "browser check: product names use the normal size, not the native large size",
+                trigger: ".payment-screen .azk-receipt-preview iframe",
+                run: () => {
+                    const doc = previewDoc();
+                    const name = doc.querySelector(".azk-lines-table .name");
+                    const view = doc.defaultView;
+                    const nameSize = parseFloat(view.getComputedStyle(name).fontSize);
+                    const baseSize = parseFloat(view.getComputedStyle(doc.getElementById("pos-receipt")).fontSize);
+                    if (nameSize > baseSize) {
+                        throw new Error(`product name ${nameSize}px is larger than the receipt text ${baseSize}px`);
+                    }
+                },
+            },
             PaymentScreen.clickPaymentMethod("Bank"),
             checkPreview("follows the payment lines", { texts: ["Bank"] }),
+            {
+                content: "browser check: design A totals, small subtotal and taxes, the Total stands out",
+                trigger: ".payment-screen .azk-receipt-preview iframe",
+                run: () => {
+                    const doc = previewDoc();
+                    const view = doc.defaultView;
+                    const size = (el) => parseFloat(view.getComputedStyle(el).fontSize);
+                    const base = size(doc.getElementById("pos-receipt"));
+                    const subtotal = doc.querySelector('[name="prices"] td[name="subtotal"]');
+                    const total = doc.querySelector('[name="prices"] td[name="total"]');
+                    if (size(subtotal) >= base) {
+                        throw new Error(`subtotal ${size(subtotal)}px should be smaller than the text ${base}px`);
+                    }
+                    if (size(total) <= size(subtotal)) {
+                        throw new Error(`Total ${size(total)}px should be larger than the subtotal ${size(subtotal)}px`);
+                    }
+                },
+            },
             PaymentScreen.clickValidate(),
             FeedbackScreen.isShown(),
             Chrome.endTour(),
@@ -194,6 +241,38 @@ registry.category("web_tour.tours").add("AzkPaymentPreviewScrollTour", {
                     throw new Error("the preview jumped back to the top");
                 },
             },
+            PaymentScreen.clickValidate(),
+            FeedbackScreen.isShown(),
+            Chrome.endTour(),
+        ].flat(Infinity),
+});
+
+// ---------------------------------------------------------------------------
+// Browser check: the three columns fit a 1024px wide screen (tablets)
+// ---------------------------------------------------------------------------
+
+const previewOnScreen = (label) => ({
+    content: `the preview column is fully on screen (${label})`,
+    trigger: ".payment-screen .azk-receipt-preview-col",
+    run: () => {
+        const col = document.querySelector(".azk-receipt-preview-col").getBoundingClientRect();
+        if (col.right > window.innerWidth + 1 || col.width < 200) {
+            throw new Error(`preview column ${col.left}-${col.right}px, screen ${window.innerWidth}px`);
+        }
+    },
+});
+
+registry.category("web_tour.tours").add("AzkPaymentPreviewFitsScreenTour", {
+    steps: () =>
+        [
+            open(),
+            ProductScreen.clickDisplayedProduct("Whiteboard Pen"),
+            ProductScreen.clickDisplayedProduct("Letter Tray"),
+            ProductScreen.clickDisplayedProduct("Desk Pad"),
+            ProductScreen.clickPayButton(),
+            previewOnScreen("before payment"),
+            PaymentScreen.clickPaymentMethod("Bank"),
+            previewOnScreen("with a payment line"),
             PaymentScreen.clickValidate(),
             FeedbackScreen.isShown(),
             Chrome.endTour(),

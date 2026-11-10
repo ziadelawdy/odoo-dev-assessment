@@ -103,27 +103,37 @@
     <!-- Receipt styles: the receipt is rendered in its own document, styled by this template. -->
     <template id="pos_order_receipt_style_enhanced" inherit_id="point_of_sale.pos_order_receipt_style">
         <xpath expr="//style" position="inside">
-            .azk-sep { border: 0; border-top: 1px dashed #000; margin: 8px 0; height: 0; }
-            .azk-muted { color: #555; }
-            .azk-company { margin-bottom: 4px; }
-            .azk-company-name { font-size: 1.3em; font-weight: bold; line-height: 1.25; }
-            .azk-company-details, .azk-company-vat { font-size: 0.85em; }
-            .azk-company-name p, .azk-company-details p { margin: 0; }
-            .azk-order-info { border-collapse: collapse; font-size: 0.85em; }
-            .azk-order-info td { padding: 1px 0; vertical-align: top; }
-            .azk-customer { font-size: 0.85em; margin-top: 4px; }
-            .azk-lines-table { border-collapse: collapse; }
-            .azk-lines-table th { border-bottom: 1px solid #000; padding: 2px 3px; font-weight: bold; font-size: 0.85em; }
-            .azk-lines-table td { padding: 5px 3px; border-bottom: 1px dashed #bbb; vertical-align: top; }
-            .azk-lines-table tr:last-child td { border-bottom: 0; }
-            .azk-lines-table .azk-num { width: 1%; white-space: nowrap; }
-            .azk-lines-table .azk-line-total { font-weight: bold; }
-            .azk-lines-table .name { font-size: 1em; font-weight: bold; line-height: 1.3; }
-            .azk-lines-table .azk-product-cell .text-small,
-            .azk-lines-table .azk-product-cell .text-normal,
-            .azk-lines-table .azk-product-cell div:not(.name) { font-size: 0.8em; color: #555; }
-            .azk-lines-table .azk-combo-child .azk-product-cell { padding-left: 14px; }
-            .azk-lines-table .azk-combo-child .name { font-weight: normal; }
+            /* Same specificity as the native rules (#pos-receipt + !important);
+               sizes in em of the receipt font, so printer sizing still applies. */
+            #pos-receipt .azk-sep { border: 0 !important; border-top: 1px dashed #000 !important; margin: 10px 0 !important; height: 0 !important; }
+            #pos-receipt .azk-muted { color: #555 !important; }
+            #pos-receipt .azk-company { margin-bottom: 4px !important; }
+            #pos-receipt .azk-company-name { font-size: 1.35em !important; font-weight: bold !important; line-height: 1.25 !important; }
+            #pos-receipt .azk-company-details, #pos-receipt .azk-company-vat { font-size: 0.82em !important; line-height: 1.35 !important; }
+            #pos-receipt .azk-company-name p, #pos-receipt .azk-company-details p { margin: 0 !important; }
+            #pos-receipt .azk-order-info { border-collapse: collapse; font-size: 0.82em !important; }
+            #pos-receipt .azk-order-info td { padding: 1px 0 !important; vertical-align: top !important; }
+            #pos-receipt .azk-customer { font-size: 0.82em !important; line-height: 1.35 !important; margin-top: 4px !important; }
+            #pos-receipt .azk-lines-table { border-collapse: collapse; }
+            #pos-receipt .azk-lines-table th { border-bottom: 1px solid #000 !important; padding: 2px 4px !important; font-weight: bold !important; font-size: 0.82em !important; }
+            #pos-receipt .azk-lines-table td { padding: 6px 4px !important; border-bottom: 1px dashed #bbb !important; vertical-align: top !important; }
+            #pos-receipt .azk-lines-table tr:last-child td { border-bottom: 0 !important; }
+            #pos-receipt .azk-lines-table .azk-num { width: 1% !important; white-space: nowrap !important; }
+            #pos-receipt .azk-lines-table .azk-line-total { font-weight: bold !important; }
+            #pos-receipt .azk-lines-table .name { font-size: 1em !important; font-weight: bold !important; line-height: 1.3 !important; }
+            #pos-receipt .azk-lines-table .azk-product-cell .text-small,
+            #pos-receipt .azk-lines-table .azk-product-cell .text-normal,
+            #pos-receipt .azk-lines-table .azk-product-cell div:not(.name) { font-size: 0.78em !important; line-height: 1.35 !important; color: #555 !important; }
+            #pos-receipt .azk-lines-table .azk-combo-child .azk-product-cell { padding-left: 16px !important; }
+            #pos-receipt .azk-lines-table .azk-combo-child .name { font-weight: normal !important; }
+            /* Totals (design A): the dashed rule before them exists only on the
+               customized receipt, so these rules never touch the native one. */
+            #pos-receipt .azk-sep + [name="prices"] .text-large,
+            #pos-receipt .azk-sep + [name="prices"] ~ [name="total_item_count"] { font-size: 0.82em !important; line-height: 1.5 !important; }
+            #pos-receipt .azk-sep + [name="prices"] tr:not(.text-bold) td { color: #555 !important; }
+            #pos-receipt .azk-sep + [name="prices"] tr.text-bold td { color: #000 !important; }
+            #pos-receipt .azk-sep + [name="prices"] td[name="total"],
+            #pos-receipt .azk-sep + [name="prices"] td[name="total"] + td { font-size: 1.5em !important; padding-top: 4px !important; }
         </xpath>
     </template>
 
