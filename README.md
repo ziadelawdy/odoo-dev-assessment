@@ -248,6 +248,18 @@ own. Installed together, they compose with no bridge module (see *Conflicts* bel
 - **Receipt:** `Salesperson: <name>` is printed under the product, only when the feature is on
   and the line is assigned. This works on the client receipt and on the server receipt
   (email/download).
+- **Reports** (*Point of Sale › Reporting*, POS managers):
+  - **Sales by Salesperson.** Every product sold, credited to the salesperson of its line. It is
+    built on the native POS analysis, so the amounts match it. Pivot (salesperson → product →
+    day), graph and a detailed list. Measures: orders, quantity, sales with and without tax,
+    discount, margin, commission. Filters for completed sales, refunds, sales without a
+    salesperson, dates, POS and session. The native *Orders* analysis can also group by salesperson.
+  - **Salesperson Performance.** One row per order and salesperson: orders, sales, **average
+    order value**, items and commission, by day, week or month. Refund orders are netted from
+    sales but are not counted as orders.
+  - **Commission:** a rate (%) on each salesperson, applied to the sales without tax. The rate is
+    frozen on the line when it is sold, so changing it later does not rewrite past commissions.
+    A refund keeps the rate of the sale it refunds.
 
 ### Enhanced Receipt Layout (`azk_pos_enhanced_receipt`)
 
@@ -326,13 +338,14 @@ Demo data creates *Salesperson A, B, C*. To set up the assessment configurations
 
 ### Automated tests
 
-61 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
+77 tests, all passing on Odoo 20 with both modules installed. They were written test-first.
 The POS tours drive Chrome through real sales.
 
 | Module / file | Covers |
 |---|---|
 | `azk_pos_salesperson/tests/test_salesperson_backend.py` | Required name. Loads only the allowed salespersons, and none when the feature is off. Order sync stores the line and order salesperson. Access rights (POS user read, manager write). Backend views. |
 | `azk_pos_salesperson/tests/test_salesperson_receipt.py` | Receipt data and server-rendered receipt: name under the product; hidden when the feature is off or the line is unassigned. |
+| `azk_pos_salesperson/tests/test_salesperson_report.py` | Commission rate bounds, frozen at sale time, kept on re-sync and on refunds. Report rows and totals per salesperson match the order lines; refunds netted; unassigned group. Performance: one row per order and salesperson, average order value, refunds not counted, company rule. Menus, actions and views. |
 | `azk_pos_salesperson/tests/test_salesperson_ui.py` | **Tours.** Test cases 2, 3 and 4. First-product popup (choose or skip). New lines inherit the order salesperson. Merge rule. Combo children. Assignments survive a browser refresh. UI hidden when the feature is off. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_backend.py` | Fields. HTML sanitizing (`<script>`, `onerror`). Form and settings views. Settings write-through. No name clash with native fields. |
 | `azk_pos_enhanced_receipt/tests/test_enhanced_receipt.py` | Enhanced layout, native when off, customer hidden, logo fallback, basic receipt table, no duplicated company info or unit price. |
